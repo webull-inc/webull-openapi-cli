@@ -38,19 +38,6 @@ func (r Region) IsValid() bool {
 	return false
 }
 
-// SupportedRegions are the regions enabled in the current release.
-var SupportedRegions = []Region{RegionUS, RegionHK, RegionJP}
-
-// IsSupported checks if a region is enabled in the current release.
-func (r Region) IsSupported() bool {
-	for _, v := range SupportedRegions {
-		if r == v {
-			return true
-		}
-	}
-	return false
-}
-
 // ApiModule identifies an API service type.
 type ApiModule string
 

@@ -23,6 +23,7 @@ var instrumentCmd = &cobra.Command{
 func init() {
 	instrumentCmd.AddCommand(instrumentStockCmd)
 	instrumentCmd.AddCommand(instrumentCryptoCmd)
+	instrumentCmd.AddCommand(instrumentOptionCmd)
 	instrumentCmd.AddCommand(instrumentFuturesCmd)
 	instrumentCmd.AddCommand(instrumentFuturesProductsCmd)
 	instrumentCmd.AddCommand(instrumentFuturesClassCmd)
@@ -93,6 +94,87 @@ func init() {
 	instrumentCryptoCmd.Flags().String("status", "", "Status: OC, CO, NT")
 	instrumentCryptoCmd.Flags().String("last-instrument-id", "", "Last instrument ID for pagination")
 	instrumentCryptoCmd.Flags().Int("page-size", 1000, "Page size (max 1000)")
+}
+
+var instrumentOptionCmd = &cobra.Command{
+	Use: "option", Short: "Query option contract information",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		category, _ := cmd.Flags().GetString("category")
+		underlyingSymbols, _ := cmd.Flags().GetString("underlying-symbols")
+		status, _ := cmd.Flags().GetString("status")
+		startDate, _ := cmd.Flags().GetString("start-date")
+		endDate, _ := cmd.Flags().GetString("end-date")
+		rootSymbol, _ := cmd.Flags().GetString("root-symbol")
+		optionSymbol, _ := cmd.Flags().GetString("option-symbol")
+		optionType, _ := cmd.Flags().GetString("option-type")
+		style, _ := cmd.Flags().GetString("style")
+		strikePriceGte, _ := cmd.Flags().GetString("strike-price-gte")
+		strikePriceLte, _ := cmd.Flags().GetString("strike-price-lte")
+		ppind, _ := cmd.Flags().GetString("ppind")
+		showDeliverables, _ := cmd.Flags().GetString("show-deliverables")
+		lastID, _ := cmd.Flags().GetString("last-instrument-id")
+		pageSize, _ := cmd.Flags().GetInt("page-size")
+
+		q := map[string]string{"category": category, "page_size": fmt.Sprintf("%d", pageSize)}
+		if underlyingSymbols != "" {
+			q["underlying_symbols"] = underlyingSymbols
+		}
+		if status != "" {
+			q["status"] = status
+		}
+		if startDate != "" {
+			q["start_date"] = startDate
+		}
+		if endDate != "" {
+			q["end_date"] = endDate
+		}
+		if rootSymbol != "" {
+			q["root_symbol"] = rootSymbol
+		}
+		if optionSymbol != "" {
+			q["option_symbol"] = optionSymbol
+		}
+		if optionType != "" {
+			q["option_type"] = optionType
+		}
+		if style != "" {
+			q["style"] = style
+		}
+		if strikePriceGte != "" {
+			q["strike_price_gte"] = strikePriceGte
+		}
+		if strikePriceLte != "" {
+			q["strike_price_lte"] = strikePriceLte
+		}
+		if ppind != "" {
+			q["ppind"] = ppind
+		}
+		if showDeliverables != "" {
+			q["show_deliverables"] = showDeliverables
+		}
+		if lastID != "" {
+			q["last_instrument_id"] = lastID
+		}
+		return doInstrumentGet("/openapi/instrument/option/contracts", q)
+	},
+}
+
+func init() {
+	instrumentOptionCmd.Flags().String("underlying-symbols", "", "Underlying symbols, comma-separated (e.g. AAPL,MSFT)")
+	instrumentOptionCmd.Flags().String("category", "US_OPTION", "Category: US_OPTION")
+	instrumentOptionCmd.Flags().String("status", "", "Contract status: LISTING, DELISTING (default LISTING)")
+	instrumentOptionCmd.Flags().String("start-date", "", "Exact expiration date (YYYY-MM-DD)")
+	instrumentOptionCmd.Flags().String("end-date", "", "Expiration date lower bound inclusive (YYYY-MM-DD)")
+	instrumentOptionCmd.Flags().String("root-symbol", "", "Root symbol / series symbol (e.g. SPXW)")
+	instrumentOptionCmd.Flags().String("option-symbol", "", "Option symbol (e.g. AAPL250620C00150000)")
+	instrumentOptionCmd.Flags().String("option-type", "", "Contract type: CALL, PUT")
+	instrumentOptionCmd.Flags().String("style", "", "Exercise style: AMERICAN, EUROPEAN")
+	instrumentOptionCmd.Flags().String("strike-price-gte", "", "Strike price lower bound (inclusive)")
+	instrumentOptionCmd.Flags().String("strike-price-lte", "", "Strike price upper bound (inclusive)")
+	instrumentOptionCmd.Flags().String("ppind", "", "Penny Program Indicator: true/false")
+	instrumentOptionCmd.Flags().String("show-deliverables", "", "Return deliverables in response: true/false (default false)")
+	instrumentOptionCmd.Flags().String("last-instrument-id", "", "Last instrument ID for pagination")
+	instrumentOptionCmd.Flags().Int("page-size", 100, "Page size (max 1000, default 100)")
 }
 
 var instrumentFuturesCmd = &cobra.Command{
@@ -249,7 +331,9 @@ func init() {
 }
 
 var instrumentCompanyProfileCmd = &cobra.Command{
-	Use: "company-profile", Short: "Get company profile information",
+	Use:        "company-profile",
+	Short:      "Get company profile information",
+	Deprecated: "use 'webull data fundamentals company-profile' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
@@ -264,7 +348,9 @@ func init() {
 }
 
 var instrumentAnalystPriceCmd = &cobra.Command{
-	Use: "analyst-price", Short: "Get analyst target price",
+	Use:        "analyst-price",
+	Short:      "Get analyst target price",
+	Deprecated: "use 'webull data fundamentals analyst-price' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
@@ -279,7 +365,9 @@ func init() {
 }
 
 var instrumentAnalystRatingCmd = &cobra.Command{
-	Use: "analyst-rating", Short: "Get analyst rating",
+	Use:        "analyst-rating",
+	Short:      "Get analyst rating",
+	Deprecated: "use 'webull data fundamentals analyst-rating' instead",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")

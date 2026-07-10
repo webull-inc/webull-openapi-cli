@@ -30,7 +30,7 @@ var authLoginCmd = &cobra.Command{
 }
 
 func init() {
-	authLoginCmd.Flags().String("region", "", "Region (required: us, hk, jp)")
+	authLoginCmd.Flags().String("region", "", "Region (required: us, hk, jp, sg, th, au, my, uk, br, mx, eu, za)")
 	authLoginCmd.Flags().String("env", "prod", "Environment (prod/uat)")
 	authLoginCmd.Flags().String("name", "", "Profile name (default: 'default')")
 	authLoginCmd.Flags().String("api-endpoint", "", "API endpoint host (required for uat)")
@@ -47,11 +47,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	region := config.Region(regionStr)
 	if !region.IsValid() {
-		output.PrintError("INVALID_REGION", fmt.Sprintf("Invalid region %q. Valid: us, hk, jp", regionStr), 0)
-		return errSilent
-	}
-	if !region.IsSupported() {
-		output.PrintError("UNSUPPORTED_REGION", fmt.Sprintf("Region %q is not yet supported. Currently available: us, hk, jp", regionStr), 0)
+		output.PrintError("INVALID_REGION", fmt.Sprintf("Invalid region %q. Valid: us, hk, jp, sg, th, au, my, uk, br, mx, eu, za", regionStr), 0)
 		return errSilent
 	}
 

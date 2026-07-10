@@ -47,6 +47,10 @@ func init() {
 
 	dataScreenerCmd.AddCommand(dataScreenerMoversCmd)
 	dataScreenerCmd.AddCommand(dataScreenerActivesCmd)
+	dataScreenerCmd.AddCommand(dataScreenerMarketSectorsCmd)
+	dataScreenerCmd.AddCommand(dataScreenerMarketSectorsDetailCmd)
+	dataScreenerCmd.AddCommand(dataScreenerHighDividendCmd)
+	dataScreenerCmd.AddCommand(dataScreener52WHLCmd)
 
 	dataOptionCmd.AddCommand(dataOptionSnapshotCmd)
 	dataOptionCmd.AddCommand(dataOptionBarsCmd)
