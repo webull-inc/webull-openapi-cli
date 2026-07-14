@@ -95,11 +95,10 @@ For non-production environments, you must provide endpoint hosts explicitly:
 ```bash
 webull auth login --region hk --env uat \
   --api-endpoint api.sandbox.webull.hk \
-  --quotes-endpoint api.sandbox.webull.hk \
   --name hk-sandbox
 ```
 
-`--api-endpoint` and `--quotes-endpoint` are required for UAT. `--events-endpoint` is optional.
+`--api-endpoint` is required for UAT.
 
 ### Environment Variables
 
@@ -222,7 +221,7 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull profile list` | List profiles |
 | `webull profile switch` | Switch active profile |
 | `webull profile logout` | Remove a profile |
-| `webull profile set-endpoint` | Override API endpoints |
+| `webull profile set-endpoint` | Override API endpoint |
 
 ### Utilities
 

@@ -34,8 +34,6 @@ func init() {
 	authLoginCmd.Flags().String("env", "prod", "Environment (prod/uat)")
 	authLoginCmd.Flags().String("name", "", "Profile name (default: 'default')")
 	authLoginCmd.Flags().String("api-endpoint", "", "API endpoint host (required for uat)")
-	authLoginCmd.Flags().String("quotes-endpoint", "", "Quotes/Data API endpoint host")
-	authLoginCmd.Flags().String("events-endpoint", "", "Events API endpoint host")
 	authLoginCmd.MarkFlagRequired("region")
 
 	authCmd.AddCommand(authLoginCmd)
@@ -80,21 +78,12 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 
 	// Resolve endpoints early so we can fail fast before asking for credentials
 	apiEndpoint, _ := cmd.Flags().GetString("api-endpoint")
-	quotesEndpoint, _ := cmd.Flags().GetString("quotes-endpoint")
-	eventsEndpoint, _ := cmd.Flags().GetString("events-endpoint")
 
-	// UAT requires --api-endpoint and --quotes-endpoint
+	// UAT requires --api-endpoint
 	if env == config.EnvUAT {
-		var missing []string
 		if apiEndpoint == "" {
-			missing = append(missing, "--api-endpoint")
-		}
-		if quotesEndpoint == "" {
-			missing = append(missing, "--quotes-endpoint")
-		}
-		if len(missing) > 0 {
 			output.PrintError("MISSING_ENDPOINT",
-				fmt.Sprintf("UAT environment requires %s", strings.Join(missing, " and ")), 0)
+				"UAT environment requires --api-endpoint", 0)
 			return errSilent
 		}
 	}
@@ -136,9 +125,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		Region: region,
 		Env:    env,
 		Endpoints: config.Endpoints{
-			API:    apiEndpoint,
-			Quotes: quotesEndpoint,
-			Events: eventsEndpoint,
+			API: apiEndpoint,
 		},
 	}
 	apiHost := auth.ResolveAPIHost(tempProfile)
@@ -164,9 +151,7 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		Region:     region,
 		Env:        env,
 		Endpoints: config.Endpoints{
-			API:    apiEndpoint,
-			Quotes: quotesEndpoint,
-			Events: eventsEndpoint,
+			API: apiEndpoint,
 		},
 		AkSk: &config.AkSkCredentials{
 			TokenCheckEnabled: configResp.TokenCheckEnabled,
