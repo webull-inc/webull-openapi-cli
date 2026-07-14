@@ -116,19 +116,9 @@ var doctorCmd = &cobra.Command{
 				if profile.Endpoints.API != "" {
 					endpoints.API = profile.Endpoints.API
 				}
-				if profile.Endpoints.Quotes != "" {
-					endpoints.Quotes = profile.Endpoints.Quotes
-				}
-				if profile.Endpoints.Events != "" {
-					endpoints.Events = profile.Endpoints.Events
-				}
 
 				netResult := map[string]interface{}{}
 				netResult["api_host"] = endpoints.API
-				netResult["quotes_host"] = endpoints.Quotes
-				if endpoints.Events != "" {
-					netResult["events_host"] = endpoints.Events
-				}
 
 				result["network"] = netResult
 

@@ -69,11 +69,9 @@ func newAPIClient() (*client.APIClient, error) {
 	// Resolve endpoints: env overrides > profile overrides > defaults
 	envOverrides := config.EnvEndpointOverrides()
 	var overrides *config.RegionEndpoints
-	if profile.Endpoints.API != "" || profile.Endpoints.Quotes != "" || profile.Endpoints.Events != "" {
+	if profile.Endpoints.API != "" {
 		overrides = &config.RegionEndpoints{
-			API:    profile.Endpoints.API,
-			Quotes: profile.Endpoints.Quotes,
-			Events: profile.Endpoints.Events,
+			API: profile.Endpoints.API,
 		}
 	}
 	endpoints := config.GetEndpoints(profile.Region, overrides)
@@ -81,12 +79,6 @@ func newAPIClient() (*client.APIClient, error) {
 	if envOverrides != nil {
 		if envOverrides.API != "" {
 			endpoints.API = envOverrides.API
-		}
-		if envOverrides.Quotes != "" {
-			endpoints.Quotes = envOverrides.Quotes
-		}
-		if envOverrides.Events != "" {
-			endpoints.Events = envOverrides.Events
 		}
 	}
 

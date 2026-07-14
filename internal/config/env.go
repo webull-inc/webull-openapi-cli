@@ -7,12 +7,10 @@ package config
 import "os"
 
 const (
-	EnvAppKey         = "WEBULL_APP_KEY"
-	EnvAppSecret      = "WEBULL_APP_SECRET"
-	EnvAPIEndpoint    = "WEBULL_API_ENDPOINT"
-	EnvQuotesEndpoint = "WEBULL_QUOTES_ENDPOINT"
-	EnvEventsEndpoint = "WEBULL_EVENTS_ENDPOINT"
-	EnvProfile        = "WEBULL_PROFILE"
+	EnvAppKey      = "WEBULL_APP_KEY"
+	EnvAppSecret   = "WEBULL_APP_SECRET"
+	EnvAPIEndpoint = "WEBULL_API_ENDPOINT"
+	EnvProfile     = "WEBULL_PROFILE"
 )
 
 // EnvCredentials attempts to load AK/SK from environment variables.
@@ -29,15 +27,11 @@ func EnvCredentials() (string, string, bool) {
 // EnvEndpointOverrides returns endpoint overrides from environment variables.
 func EnvEndpointOverrides() *RegionEndpoints {
 	api := os.Getenv(EnvAPIEndpoint)
-	quotes := os.Getenv(EnvQuotesEndpoint)
-	events := os.Getenv(EnvEventsEndpoint)
 
-	if api == "" && quotes == "" && events == "" {
+	if api == "" {
 		return nil
 	}
 	return &RegionEndpoints{
-		API:    api,
-		Quotes: quotes,
-		Events: events,
+		API: api,
 	}
 }

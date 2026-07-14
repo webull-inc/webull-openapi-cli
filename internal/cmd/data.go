@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/webull-inc/webull-openapi-cli/internal/client"
-	"github.com/webull-inc/webull-openapi-cli/internal/config"
 	"github.com/webull-inc/webull-openapi-cli/internal/output"
 )
 
@@ -171,7 +170,7 @@ var dataStockBatchBarsCmd = &cobra.Command{
 			return err
 		}
 		resp, err := cl.Do(context.Background(), "POST", "/openapi/market-data/stock/batch-bars", &client.RequestOptions{
-			Module: config.ModuleQuotes, Body: body,
+			Body: body,
 		})
 		if err != nil {
 			output.PrintError("REQUEST_ERROR", err.Error(), 0)
@@ -701,7 +700,7 @@ func doDataGet(path string, query map[string]string) error {
 		return err
 	}
 	resp, err := cl.Do(context.Background(), "GET", path, &client.RequestOptions{
-		Module: config.ModuleQuotes, Query: query,
+		Query: query,
 	})
 	if err != nil {
 		output.PrintError("REQUEST_ERROR", err.Error(), 0)

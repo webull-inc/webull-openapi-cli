@@ -25,8 +25,6 @@ func init() {
 	profileCmd.AddCommand(profileSetEndpointCmd)
 
 	profileSetEndpointCmd.Flags().String("api-endpoint", "", "Override API endpoint")
-	profileSetEndpointCmd.Flags().String("quotes-endpoint", "", "Override Quotes API endpoint (data-api)")
-	profileSetEndpointCmd.Flags().String("events-endpoint", "", "Override Events API endpoint")
 }
 
 var profileListCmd = &cobra.Command{
@@ -130,21 +128,17 @@ var profileLogoutCmd = &cobra.Command{
 
 var profileSetEndpointCmd = &cobra.Command{
 	Use:   "set-endpoint",
-	Short: "Set custom endpoint overrides for the active profile",
-	Long: `Set custom API/Data/Events endpoint overrides for the active profile.
-Only specified endpoints are updated; others remain unchanged.
+	Short: "Set custom endpoint override for the active profile",
+	Long: `Set custom API endpoint override for the active profile.
 
 Examples:
   webull profile set-endpoint --api-endpoint us-openapi-alb.uat.webullbroker.com
-  webull profile set-endpoint --data-endpoint us-data-api.uat.webullbroker.com
-  webull profile set-endpoint --api-endpoint api.webull.com --data-endpoint data-api.webull.com`,
+  webull profile set-endpoint --api-endpoint api.webull.com`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiEp, _ := cmd.Flags().GetString("api-endpoint")
-		quotesEp, _ := cmd.Flags().GetString("quotes-endpoint")
-		eventsEp, _ := cmd.Flags().GetString("events-endpoint")
 
-		if apiEp == "" && quotesEp == "" && eventsEp == "" {
-			output.PrintError("MISSING_PARAMETER", "at least one of --api-endpoint, --quotes-endpoint, --events-endpoint is required", 0)
+		if apiEp == "" {
+			output.PrintError("MISSING_PARAMETER", "--api-endpoint is required", 0)
 			return fmt.Errorf("no endpoint specified")
 		}
 
@@ -164,32 +158,15 @@ Examples:
 			return fmt.Errorf("active profile %q not found", cfg.ActiveProfile)
 		}
 
-		// Incremental update: only override specified endpoints
-		if apiEp != "" {
-			profile.Endpoints.API = apiEp
-		}
-		if quotesEp != "" {
-			profile.Endpoints.Quotes = quotesEp
-		}
-		if eventsEp != "" {
-			profile.Endpoints.Events = eventsEp
-		}
+		profile.Endpoints.API = apiEp
 
 		if err := pm.Save(cfg); err != nil {
 			return err
 		}
 
 		if !flagQuiet {
-			fmt.Fprintf(os.Stderr, "✓ Endpoints updated for profile %q\n", profile.Name)
-			if apiEp != "" {
-				fmt.Fprintf(os.Stderr, "  api:        %s\n", apiEp)
-			}
-			if quotesEp != "" {
-				fmt.Fprintf(os.Stderr, "  quotes-api: %s\n", quotesEp)
-			}
-			if eventsEp != "" {
-				fmt.Fprintf(os.Stderr, "  events-api: %s\n", eventsEp)
-			}
+			fmt.Fprintf(os.Stderr, "✓ Endpoint updated for profile %q\n", profile.Name)
+			fmt.Fprintf(os.Stderr, "  api: %s\n", apiEp)
 		}
 		return nil
 	},
