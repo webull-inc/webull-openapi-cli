@@ -519,8 +519,8 @@ func init() {
 	orderOptionReplaceCmd.Flags().String("stop-price", "", "New stop price")
 	orderOptionReplaceCmd.Flags().String("order-type", "", "New order type")
 	orderOptionReplaceCmd.Flags().String("time-in-force", "", "New time in force")
-	orderOptionReplaceCmd.Flags().String("leg-id", "", "Leg ID (US only)")
-	orderOptionReplaceCmd.Flags().String("leg-qty", "", "New leg quantity (US only)")
+	orderOptionReplaceCmd.Flags().String("leg-id", "", "Leg ID (US/BR/MX)")
+	orderOptionReplaceCmd.Flags().String("leg-qty", "", "New leg quantity (US/BR/MX)")
 	orderOptionReplaceCmd.Flags().String("body", "", "JSON body (multi-leg)")
 	orderOptionReplaceCmd.Flags().String("file", "", "JSON file (multi-leg)")
 }

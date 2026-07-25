@@ -7,7 +7,7 @@ CLI for [Webull](https://www.webull.com/) OpenAPI. Trade stocks, options, future
 ## Features
 
 - **Full asset coverage**: Stocks, options, futures, crypto, event contracts
-- **Multi-region**: US, HK, JP
+- **Multi-region**: US, HK, JP, SG, TH, AU, MY, UK, BR, MX, EU, ZA
 - **Agent-first design**: JSON output, `--quiet` mode, structured errors, explicit exit codes
 - **AK/SK authentication**: HMAC signature + optional 2FA token
 - **Safety**: Order confirmation prompts (skip with `-y`), `--dry-run` mode
@@ -69,6 +69,10 @@ webull instrument stock --symbol AAPL
 
 # Check top gainers
 webull data screener gainers-losers --direction DESC
+
+# Get company fundamentals
+webull data fundamentals company-profile --symbol AAPL
+webull data fundamentals earnings-calendar --symbol 00700 --category HK_STOCK
 ```
 
 ## Authentication
@@ -172,6 +176,33 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull data event depth` | Event contract order book |
 | `webull data screener gainers-losers` | Top gainers/losers |
 | `webull data screener actives` | Most active stocks |
+| `webull data screener market-sectors` | Market sector overview and rankings |
+| `webull data screener market-sectors-detail` | Stock list for a specific sector |
+| `webull data screener high-dividend` | High dividend stocks ranking |
+| `webull data screener 52whl` | 52-week high/low stocks |
+| `webull data fundamentals company-profile` | Company profile information |
+| `webull data fundamentals analyst-price` | Analyst target price |
+| `webull data fundamentals analyst-rating` | Analyst rating |
+| `webull data fundamentals forecast-eps` | Forecast EPS (most recent 5 quarters) |
+| `webull data fundamentals filings` | SEC filings |
+| `webull data fundamentals earnings-calendar` | Earnings calendar |
+| `webull data fundamentals dividend-calendar` | Dividend calendar |
+| `webull data fundamentals capital-flow` | Capital flow distribution |
+| `webull data fundamentals industry-comparison` | Industry peer comparison |
+| `webull data fundamentals indicators` | Financial indicators (ROA, ROE, EPS) |
+| `webull data fundamentals income` | Income statement |
+| `webull data fundamentals cashflow` | Cash flow statement |
+| `webull data fundamentals balancesheet` | Balance sheet |
+| `webull data fundamentals alert` | Earnings release alert |
+| `webull data fundamentals fund-brief` | Fund brief information |
+| `webull data fundamentals fund-performance` | Fund performance returns |
+| `webull data fundamentals fund-net-value` | Fund NAV history |
+| `webull data fundamentals fund-holdings` | Fund top 10 holdings |
+| `webull data fundamentals fund-dividends` | Fund dividend history |
+| `webull data fundamentals fund-rating` | Fund rating history |
+| `webull data fundamentals fund-splits` | Fund split history |
+| `webull data fundamentals fund-files` | Fund documents and files |
+| `webull data fundamentals fund-allocation` | Fund asset allocation |
 
 ### Instruments (`webull instrument`)
 
@@ -186,9 +217,9 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull instrument event-categories` | List event categories |
 | `webull instrument event-series` | List event series |
 | `webull instrument event-events` | List events by series |
-| `webull instrument company-profile` | Company profile |
-| `webull instrument analyst-price` | Analyst target price |
-| `webull instrument analyst-rating` | Analyst rating |
+| `webull instrument company-profile` | Company profile *(deprecated, use `data fundamentals`)* |
+| `webull instrument analyst-price` | Analyst target price *(deprecated, use `data fundamentals`)* |
+| `webull instrument analyst-rating` | Analyst rating *(deprecated, use `data fundamentals`)* |
 
 ### Watchlists (`webull watchlist`)
 
