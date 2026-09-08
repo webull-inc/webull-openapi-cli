@@ -41,6 +41,7 @@ func init() {
 	orderCmd.AddCommand(orderListCmd)
 	orderCmd.AddCommand(orderDetailCmd)
 	orderCmd.AddCommand(orderHistoryCmd)
+	orderCmd.AddCommand(orderExecutionsCmd)
 
 	orderStockCmd.AddCommand(orderStockSubmitCmd)
 	orderStockCmd.AddCommand(orderStockPreviewCmd)
@@ -933,6 +934,69 @@ func init() {
 	orderHistoryCmd.Flags().Int("limit", 20, "Max results")
 	orderHistoryCmd.Flags().String("last-client-order-id", "", "Last client order ID for pagination")
 	orderHistoryCmd.MarkFlagRequired("account-id")
+}
+
+var orderExecutionsCmd = &cobra.Command{
+	Use: "executions", Short: "List order execution records within a date range",
+	Long: `List order execution records within a specified date range.
+
+Currently supported for Webull HK. Uses the endpoint
+/trading/orders/executions/list.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		accountID, _ := cmd.Flags().GetString("account-id")
+		clientOrderID, _ := cmd.Flags().GetString("client-order-id")
+		start, _ := cmd.Flags().GetString("start")
+		end, _ := cmd.Flags().GetString("end")
+		lastExecutionID, _ := cmd.Flags().GetString("last-execution-id")
+		pageSize, _ := cmd.Flags().GetInt("page-size")
+
+		q := map[string]string{"account_id": accountID}
+		if clientOrderID != "" {
+			q["client_order_id"] = clientOrderID
+		}
+		if start != "" {
+			q["start_date"] = start
+		}
+		if end != "" {
+			q["end_date"] = end
+		}
+		if lastExecutionID != "" {
+			q["last_execution_id"] = lastExecutionID
+		}
+		if pageSize > 0 {
+			q["page_size"] = fmt.Sprintf("%d", pageSize)
+		}
+
+		cl, err := newAPIClient()
+		if err != nil {
+			return err
+		}
+		resp, err := cl.Do(context.Background(), "GET", "/trading/orders/executions/list", &client.RequestOptions{
+			Query: q,
+		})
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != 200 {
+			fmt.Fprintln(os.Stderr, string(resp.Body))
+			return errSilent
+		}
+		if flagCSV {
+			return output.PrintCSV(resp.Body)
+		}
+		output.PrintRawJSON(resp.Body)
+		return nil
+	},
+}
+
+func init() {
+	orderExecutionsCmd.Flags().String("account-id", "", "Account ID (required)")
+	orderExecutionsCmd.Flags().String("client-order-id", "", "Filter by client order ID")
+	orderExecutionsCmd.Flags().String("start", "", "Start date (YYYY-MM-DD)")
+	orderExecutionsCmd.Flags().String("end", "", "End date (YYYY-MM-DD)")
+	orderExecutionsCmd.Flags().String("last-execution-id", "", "Last execution ID from previous response for pagination")
+	orderExecutionsCmd.Flags().Int("page-size", 10, "Page size (default 10)")
+	orderExecutionsCmd.MarkFlagRequired("account-id")
 }
 
 // ==================== Helpers ====================

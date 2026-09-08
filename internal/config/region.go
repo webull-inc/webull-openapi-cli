@@ -12,20 +12,21 @@ const (
 	RegionHK Region = "hk"
 	RegionJP Region = "jp"
 	RegionSG Region = "sg"
-	RegionTH Region = "th"
-	RegionAU Region = "au"
 	RegionMY Region = "my"
 	RegionUK Region = "uk"
 	RegionBR Region = "br"
 	RegionMX Region = "mx"
-	RegionEU Region = "eu"
 	RegionZA Region = "za"
 )
 
-// ValidRegions is the list of all supported regions.
+// ValidRegions is the list of currently supported regions.
+//
+// Note: TH, EU, and AU are not supported yet due to compliance
+// requirements, so they are intentionally omitted here and fail IsValid.
+// To enable a region later, add its constant back to this list.
 var ValidRegions = []Region{
-	RegionUS, RegionHK, RegionJP, RegionSG, RegionTH, RegionAU,
-	RegionMY, RegionUK, RegionBR, RegionMX, RegionEU, RegionZA,
+	RegionUS, RegionHK, RegionJP, RegionSG,
+	RegionMY, RegionUK, RegionBR, RegionMX, RegionZA,
 }
 
 // IsValid checks if a region string is supported.
@@ -68,13 +69,10 @@ var defaultEndpoints = map[Region]RegionEndpoints{
 	RegionHK: {API: "api.webull.hk", Quotes: "data-api.webull.hk", Events: "events-api.webull.hk"},
 	RegionJP: {API: "api.webull.co.jp", Quotes: "data-api.webull.co.jp", Events: "events-api.webull.co.jp"},
 	RegionSG: {API: "api.webull.com.sg", Quotes: "data-api.webull.com.sg", Events: "events-api.webull.com.sg"},
-	RegionTH: {API: "api.webull.co.th", Quotes: "data-api.webull.co.th", Events: "events-api.webull.co.th"},
-	RegionAU: {API: "api.webull.com.au", Quotes: "data-api.webull.com.au", Events: "events-api.webull.com.au"},
 	RegionMY: {API: "api.webull.com.my", Quotes: "data-api.webull.com.my", Events: "events-api.webull.com.my"},
 	RegionUK: {API: "api.webull-uk.com", Quotes: "data-api.webull-uk.com", Events: "events-api.webull-uk.com"},
 	RegionBR: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
 	RegionMX: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
-	RegionEU: {API: "api.webull.eu", Quotes: "data-api.webull.eu", Events: "events-api.webull.eu"},
 	RegionZA: {API: "api.webull.com.au", Quotes: "data-api.webull.com.au", Events: "events-api.webull.com.au"},
 }
 
