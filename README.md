@@ -7,7 +7,7 @@ CLI for [Webull](https://www.webull.com/) OpenAPI. Trade stocks, options, future
 ## Features
 
 - **Full asset coverage**: Stocks, options, futures, crypto, event contracts
-- **Multi-region**: US, HK, JP, SG, TH, AU, MY, UK, BR, MX, EU, ZA
+- **Multi-region**: US, HK, JP, SG, MY, UK, BR, MX, ZA
 - **Agent-first design**: JSON output, `--quiet` mode, structured errors, explicit exit codes
 - **AK/SK authentication**: HMAC signature + optional 2FA token
 - **Safety**: Order confirmation prompts (skip with `-y`), `--dry-run` mode
@@ -145,6 +145,7 @@ Orders are organized by asset class under `webull order <asset>`:
 | `webull order open` | List open orders |
 | `webull order detail` | Get order details |
 | `webull order history` | Order history |
+| `webull order executions` | List order execution records within a date range (HK) |
 
 ### Market Data (`webull data`)
 
