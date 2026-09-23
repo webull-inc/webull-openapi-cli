@@ -167,7 +167,7 @@ var accountPositionsCmd = &cobra.Command{
 			return err
 		}
 
-		resp, err := c.Do(context.Background(), "GET", "/openapi/assets/positions", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "GET", "/trading/assets/positions/list", &client.RequestOptions{
 			Query: map[string]string{"account_id": accountID},
 		})
 		if err != nil {

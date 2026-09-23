@@ -172,7 +172,7 @@ var orderStockSubmitCmd = &cobra.Command{
 		body := map[string]interface{}{"account_id": accountID, "new_orders": []interface{}{ob}}
 
 		if dryRun {
-			return output.PrintJSON(map[string]interface{}{"dry_run": true, "request": map[string]interface{}{"method": "POST", "path": "/openapi/trade/order/place", "body": body}})
+			return output.PrintJSON(map[string]interface{}{"dry_run": true, "request": map[string]interface{}{"method": "POST", "path": "/trading/orders/place", "body": body}})
 		}
 		if !flagYes && !flagQuiet {
 			fmt.Fprintf(os.Stderr, "Submit order: %s %s %s %s", side, qty, symbol, orderType)
@@ -379,15 +379,24 @@ func buildOptionOrderBody(cmd *cobra.Command) map[string]interface{} {
 	if positionIntent, _ := cmd.Flags().GetString("position-intent"); positionIntent != "" {
 		order["position_intent"] = positionIntent
 	}
+	if accountTaxType, _ := cmd.Flags().GetString("account-tax-type"); accountTaxType != "" {
+		order["account_tax_type"] = accountTaxType
+	}
 	return order
 }
 
 var orderOptionSubmitCmd = &cobra.Command{
 	Use: "submit", Short: "Place a single-leg option order",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateOptionOrderFlags(cmd); err != nil {
+			return err
+		}
 		accountID, _ := cmd.Flags().GetString("account-id")
 		order := buildOptionOrderBody(cmd)
 		body := map[string]interface{}{"account_id": accountID, "new_orders": []interface{}{order}}
+		if err := validateOptionOrderBody(body); err != nil {
+			return err
+		}
 
 		if !flagYes && !flagQuiet {
 			symbol, _ := cmd.Flags().GetString("symbol")
@@ -419,9 +428,10 @@ func init() {
 	orderOptionSubmitCmd.Flags().String("limit-price", "", "Limit price")
 	orderOptionSubmitCmd.Flags().String("stop-price", "", "Stop price")
 	orderOptionSubmitCmd.Flags().String("time-in-force", "DAY", "Time in force: DAY, GTC")
-	orderOptionSubmitCmd.Flags().String("market", "US", "Market: US, HK, JP, CN, etc. See developer docs for full list by region")
+	orderOptionSubmitCmd.Flags().String("market", "US", "Market: US")
 	orderOptionSubmitCmd.Flags().String("client-order-id", "", "Custom order ID")
 	orderOptionSubmitCmd.Flags().String("position-intent", "", "Position intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE")
+	orderOptionSubmitCmd.Flags().String("account-tax-type", "", "Account tax type (JP only): SPECIFIC, GENERAL")
 	orderOptionSubmitCmd.MarkFlagRequired("account-id")
 	orderOptionSubmitCmd.MarkFlagRequired("symbol")
 	orderOptionSubmitCmd.MarkFlagRequired("side")
@@ -434,9 +444,16 @@ func init() {
 var orderOptionPreviewCmd = &cobra.Command{
 	Use: "preview", Short: "Preview option order fees",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateOptionOrderFlags(cmd); err != nil {
+			return err
+		}
 		accountID, _ := cmd.Flags().GetString("account-id")
 		order := buildOptionOrderBody(cmd)
-		return doPreviewOrder(map[string]interface{}{"account_id": accountID, "new_orders": []interface{}{order}})
+		body := map[string]interface{}{"account_id": accountID, "new_orders": []interface{}{order}}
+		if err := validateOptionOrderBody(body); err != nil {
+			return err
+		}
+		return doPreviewOrder(body)
 	},
 }
 
@@ -452,8 +469,10 @@ func init() {
 	orderOptionPreviewCmd.Flags().String("limit-price", "", "Limit price")
 	orderOptionPreviewCmd.Flags().String("stop-price", "", "Stop price")
 	orderOptionPreviewCmd.Flags().String("time-in-force", "DAY", "Time in force")
-	orderOptionPreviewCmd.Flags().String("market", "US", "Market: US, HK, JP, CN, etc. See developer docs for full list by region")
+	orderOptionPreviewCmd.Flags().String("market", "US", "Market: US")
 	orderOptionPreviewCmd.Flags().String("client-order-id", "", "Custom order ID")
+	orderOptionPreviewCmd.Flags().String("position-intent", "", "Position intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE")
+	orderOptionPreviewCmd.Flags().String("account-tax-type", "", "Account tax type (JP only): SPECIFIC, GENERAL")
 	orderOptionPreviewCmd.MarkFlagRequired("account-id")
 	orderOptionPreviewCmd.MarkFlagRequired("symbol")
 	orderOptionPreviewCmd.MarkFlagRequired("side")
@@ -465,12 +484,18 @@ func init() {
 
 var orderOptionReplaceCmd = &cobra.Command{
 	Use: "replace", Short: "Modify an existing option order",
-	Long: `Modify an option order. Use flags for single-leg, or --body/--file for multi-leg JSON.`,
+	Long: `Modify an option order. Use flags for a single leg, or --body/--file for JSON (including multi-leg).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		bodyStr, _ := cmd.Flags().GetString("body")
 		fileStr, _ := cmd.Flags().GetString("file")
 		if bodyStr != "" || fileStr != "" {
+			if err := validateOptionAccess(); err != nil {
+				return err
+			}
 			return doJSONReplace(cmd)
+		}
+		if err := validateOptionReplaceFlags(cmd); err != nil {
+			return err
 		}
 
 		accountID, _ := cmd.Flags().GetString("account-id")
@@ -522,13 +547,17 @@ func init() {
 	orderOptionReplaceCmd.Flags().String("time-in-force", "", "New time in force")
 	orderOptionReplaceCmd.Flags().String("leg-id", "", "Leg ID (US/BR/MX)")
 	orderOptionReplaceCmd.Flags().String("leg-qty", "", "New leg quantity (US/BR/MX)")
-	orderOptionReplaceCmd.Flags().String("body", "", "JSON body (multi-leg)")
-	orderOptionReplaceCmd.Flags().String("file", "", "JSON file (multi-leg)")
+	orderOptionReplaceCmd.Flags().String("body", "", "JSON body (single-leg)")
+	orderOptionReplaceCmd.Flags().String("file", "", "JSON file (single-leg)")
 }
 
 var orderOptionStrategyCmd = &cobra.Command{
-	Use: "strategy", Short: "Place a multi-leg option strategy order via JSON",
-	RunE: func(cmd *cobra.Command, args []string) error { return doJSONOrder(cmd, "strategy") },
+	Use: "strategy", Short: "Place a single-leg or multi-leg (US only) option order via JSON",
+	Long: `Place an option order via JSON.
+
+In region 'us' the JSON body is sent as-is (single-leg or multi-leg strategies).
+Other regions accept option_strategy SINGLE only.`,
+	RunE: func(cmd *cobra.Command, args []string) error { return doJSONOptionOrder(cmd) },
 }
 
 func init() {
@@ -784,6 +813,9 @@ var orderCancelCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountID, _ := cmd.Flags().GetString("account-id")
 		clientOrderID, _ := cmd.Flags().GetString("client-order-id")
+		if err := validateClientOrderID(clientOrderID); err != nil {
+			return err
+		}
 		if !flagYes && !flagQuiet {
 			fmt.Fprintf(os.Stderr, "Cancel order %s? [y/N]: ", clientOrderID)
 			var c string
@@ -797,7 +829,7 @@ var orderCancelCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := cl.Do(context.Background(), "POST", "/openapi/trade/order/cancel", &client.RequestOptions{
+		resp, err := cl.Do(context.Background(), "POST", "/trading/orders/cancel", &client.RequestOptions{
 			Body: map[string]interface{}{"account_id": accountID, "client_order_id": clientOrderID},
 		})
 		if err != nil {
@@ -823,17 +855,19 @@ var orderListCmd = &cobra.Command{
 	Use: "open", Short: "List open orders",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountID, _ := cmd.Flags().GetString("account-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		lastID, _ := cmd.Flags().GetString("last-client-order-id")
-		q := map[string]string{"account_id": accountID, "page_size": fmt.Sprintf("%d", pageSize)}
-		if lastID != "" {
-			q["last_client_order_id"] = lastID
+		paginationKey, _ := cmd.Flags().GetString("pagination-key")
+		if err := validatePaginationKey(paginationKey); err != nil {
+			return err
+		}
+		q := map[string]string{"account_id": accountID}
+		if paginationKey != "" {
+			q["pagination_key"] = paginationKey
 		}
 		cl, err := newAPIClient()
 		if err != nil {
 			return err
 		}
-		resp, err := cl.Do(context.Background(), "GET", "/openapi/trade/order/open", &client.RequestOptions{
+		resp, err := cl.Do(context.Background(), "GET", "/trading/orders/open-orders/list", &client.RequestOptions{
 			Query: q,
 		})
 		if err != nil {
@@ -853,8 +887,7 @@ var orderListCmd = &cobra.Command{
 
 func init() {
 	orderListCmd.Flags().String("account-id", "", "Account ID (required)")
-	orderListCmd.Flags().Int("page-size", 10, "Page size (max 200)")
-	orderListCmd.Flags().String("last-client-order-id", "", "Last client order ID for pagination")
+	orderListCmd.Flags().String("pagination-key", "", "Pagination key from the previous response")
 	orderListCmd.MarkFlagRequired("account-id")
 }
 
@@ -863,11 +896,14 @@ var orderDetailCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountID, _ := cmd.Flags().GetString("account-id")
 		clientOrderID, _ := cmd.Flags().GetString("client-order-id")
+		if err := validateClientOrderID(clientOrderID); err != nil {
+			return err
+		}
 		cl, err := newAPIClient()
 		if err != nil {
 			return err
 		}
-		resp, err := cl.Do(context.Background(), "GET", "/openapi/trade/order/detail", &client.RequestOptions{
+		resp, err := cl.Do(context.Background(), "GET", "/trading/orders/get", &client.RequestOptions{
 			Query: map[string]string{"account_id": accountID, "client_order_id": clientOrderID},
 		})
 		if err != nil {
@@ -895,23 +931,35 @@ var orderHistoryCmd = &cobra.Command{
 		accountID, _ := cmd.Flags().GetString("account-id")
 		start, _ := cmd.Flags().GetString("start")
 		end, _ := cmd.Flags().GetString("end")
-		limit, _ := cmd.Flags().GetInt("limit")
-		lastID, _ := cmd.Flags().GetString("last-client-order-id")
-		q := map[string]string{"account_id": accountID, "page_size": fmt.Sprintf("%d", limit)}
+		paginationKey, _ := cmd.Flags().GetString("pagination-key")
 		if start != "" {
-			q["start_date"] = start
+			if err := validateUTCTimestamp("start time", start); err != nil {
+				return err
+			}
 		}
 		if end != "" {
-			q["end_date"] = end
+			if err := validateUTCTimestamp("end time", end); err != nil {
+				return err
+			}
 		}
-		if lastID != "" {
-			q["last_client_order_id"] = lastID
+		if err := validatePaginationKey(paginationKey); err != nil {
+			return err
+		}
+		q := map[string]string{"account_id": accountID}
+		if start != "" {
+			q["start_time"] = start
+		}
+		if end != "" {
+			q["end_time"] = end
+		}
+		if paginationKey != "" {
+			q["pagination_key"] = paginationKey
 		}
 		cl, err := newAPIClient()
 		if err != nil {
 			return err
 		}
-		resp, err := cl.Do(context.Background(), "GET", "/openapi/trade/order/history", &client.RequestOptions{Query: q})
+		resp, err := cl.Do(context.Background(), "GET", "/trading/orders/historical-orders/list", &client.RequestOptions{Query: q})
 		if err != nil {
 			return err
 		}
@@ -929,10 +977,9 @@ var orderHistoryCmd = &cobra.Command{
 
 func init() {
 	orderHistoryCmd.Flags().String("account-id", "", "Account ID (required)")
-	orderHistoryCmd.Flags().String("start", "", "Start date (YYYY-MM-DD)")
-	orderHistoryCmd.Flags().String("end", "", "End date (YYYY-MM-DD)")
-	orderHistoryCmd.Flags().Int("limit", 20, "Max results")
-	orderHistoryCmd.Flags().String("last-client-order-id", "", "Last client order ID for pagination")
+	orderHistoryCmd.Flags().String("start", "", "Start time (YYYY-MM-DDTHH:mm:ss.SSSZ UTC)")
+	orderHistoryCmd.Flags().String("end", "", "End time (YYYY-MM-DDTHH:mm:ss.SSSZ UTC)")
+	orderHistoryCmd.Flags().String("pagination-key", "", "Pagination key from the previous response")
 	orderHistoryCmd.MarkFlagRequired("account-id")
 }
 
@@ -1007,7 +1054,7 @@ func doPlaceOrder(body map[string]interface{}) error {
 		output.PrintError("CONFIG_ERROR", err.Error(), 0)
 		return err
 	}
-	resp, err := cl.Do(context.Background(), "POST", "/openapi/trade/order/place", &client.RequestOptions{Body: body})
+	resp, err := cl.Do(context.Background(), "POST", "/trading/orders/place", &client.RequestOptions{Body: body})
 	if err != nil {
 		output.PrintError("REQUEST_ERROR", err.Error(), 0)
 		return err
@@ -1028,7 +1075,7 @@ func doPreviewOrder(body map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	resp, err := cl.Do(context.Background(), "POST", "/openapi/trade/order/preview", &client.RequestOptions{Body: body})
+	resp, err := cl.Do(context.Background(), "POST", "/trading/orders/preview", &client.RequestOptions{Body: body})
 	if err != nil {
 		return err
 	}
@@ -1123,7 +1170,7 @@ func doConfirmAndReplace(body map[string]interface{}, clientOrderID, asset strin
 	if err != nil {
 		return err
 	}
-	resp, err := cl.Do(context.Background(), "POST", "/openapi/trade/order/replace", &client.RequestOptions{Body: body})
+	resp, err := cl.Do(context.Background(), "POST", "/trading/orders/replace", &client.RequestOptions{Body: body})
 	if err != nil {
 		return err
 	}
@@ -1153,6 +1200,31 @@ func doJSONOrder(cmd *cobra.Command, label string) error {
 	return doPlaceOrder(body)
 }
 
+func doJSONOptionOrder(cmd *cobra.Command) error {
+	region, err := activeOptionRegion()
+	if err != nil {
+		return err
+	}
+	body, err := readJSONInput(cmd)
+	if err != nil {
+		output.PrintError("INPUT_ERROR", err.Error(), 0)
+		return err
+	}
+	if err := validateOptionStrategyOrderBody(body, region); err != nil {
+		return err
+	}
+	if !flagYes && !flagQuiet {
+		fmt.Fprint(os.Stderr, "Submit option order? [y/N]: ")
+		var confirmation string
+		fmt.Scanln(&confirmation)
+		if confirmation != "y" && confirmation != "Y" {
+			fmt.Fprintln(os.Stderr, "Order cancelled.")
+			return nil
+		}
+	}
+	return doPlaceOrder(body)
+}
+
 func doJSONReplace(cmd *cobra.Command) error {
 	body, err := readJSONInput(cmd)
 	if err != nil {
@@ -1172,7 +1244,7 @@ func doJSONReplace(cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	resp, err := cl.Do(context.Background(), "POST", "/openapi/trade/order/replace", &client.RequestOptions{Body: body})
+	resp, err := cl.Do(context.Background(), "POST", "/trading/orders/replace", &client.RequestOptions{Body: body})
 	if err != nil {
 		return err
 	}

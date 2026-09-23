@@ -651,16 +651,25 @@ func init() {
 var dataOptionSnapshotCmd = &cobra.Command{
 	Use: "snapshot", Short: "Option real-time snapshot",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateOptionAccess(); err != nil {
+			return err
+		}
 		symbol, _ := cmd.Flags().GetString("symbol")
+		if err := validateSymbols("symbols", symbol, 20); err != nil {
+			return err
+		}
 		category, _ := cmd.Flags().GetString("category")
-		return doDataGet("/openapi/market-data/option/snapshot", map[string]string{
+		if err := validateEnum("category", category, "US_OPTION"); err != nil {
+			return err
+		}
+		return doDataGet("/market-data/options/snapshots/list", map[string]string{
 			"symbols": symbol, "category": category,
 		})
 	},
 }
 
 func init() {
-	dataOptionSnapshotCmd.Flags().String("symbol", "", "Option symbol(s), comma-separated (required)")
+	dataOptionSnapshotCmd.Flags().String("symbol", "", "Option symbols, comma-separated (required, maximum 20)")
 	dataOptionSnapshotCmd.Flags().String("category", "US_OPTION", "Category: US_OPTION")
 	dataOptionSnapshotCmd.MarkFlagRequired("symbol")
 }
@@ -668,40 +677,63 @@ func init() {
 var dataOptionBarsCmd = &cobra.Command{
 	Use: "bars", Short: "Option historical bars",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateOptionAccess(); err != nil {
+			return err
+		}
 		symbol, _ := cmd.Flags().GetString("symbol")
+		if err := validateSymbols("symbols", symbol, 20); err != nil {
+			return err
+		}
 		category, _ := cmd.Flags().GetString("category")
+		if err := validateEnum("category", category, "US_OPTION"); err != nil {
+			return err
+		}
 		timespan, _ := cmd.Flags().GetString("timespan")
+		if err := validateEnum("timespan", timespan, "M1", "M5", "M15", "M30", "M60", "M120", "M240", "D", "W", "M", "Y"); err != nil {
+			return err
+		}
 		count, _ := cmd.Flags().GetInt("count")
+		if count <= 0 || count > 1200 {
+			return fmt.Errorf("count must be between 1 and 1200")
+		}
 		realTime, _ := cmd.Flags().GetBool("real-time")
 		q := map[string]string{
 			"symbols": symbol, "category": category,
 			"timespan": timespan, "count": fmt.Sprintf("%d", count),
+			"real_time_required": fmt.Sprintf("%t", realTime),
 		}
-		if realTime {
-			q["real_time_required"] = "true"
-		} else {
-			q["real_time_required"] = "false"
-		}
-		return doDataGet("/openapi/market-data/option/bars", q)
+		return doDataGet("/market-data/options/bars/list", q)
 	},
 }
 
 func init() {
-	dataOptionBarsCmd.Flags().String("symbol", "", "Option symbol(s), comma-separated (required)")
+	dataOptionBarsCmd.Flags().String("symbol", "", "Option symbols, comma-separated (required, maximum 20)")
 	dataOptionBarsCmd.Flags().String("category", "US_OPTION", "Category: US_OPTION")
-	dataOptionBarsCmd.Flags().String("timespan", "D", "Timespan: M1,M5,M15,M30,H1,D,W")
-	dataOptionBarsCmd.Flags().Int("count", 200, "Number of bars (max 1200)")
-	dataOptionBarsCmd.Flags().Bool("real-time", true, "Include latest in-progress bar")
+	dataOptionBarsCmd.Flags().String("timespan", "D", "Timespan: M1, M5, M15, M30, M60, M120, M240, D, W, M, Y")
+	dataOptionBarsCmd.Flags().Int("count", 200, "Number of bars (1-1200)")
+	dataOptionBarsCmd.Flags().Bool("real-time", false, "Include the latest in-progress bar")
 	dataOptionBarsCmd.MarkFlagRequired("symbol")
 }
 
 var dataOptionTickCmd = &cobra.Command{
 	Use: "tick", Short: "Option tick data",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := validateOptionAccess(); err != nil {
+			return err
+		}
 		symbol, _ := cmd.Flags().GetString("symbol")
+		if err := validateSymbols("symbol", symbol, 1); err != nil {
+			return err
+		}
 		category, _ := cmd.Flags().GetString("category")
+		if err := validateEnum("category", category, "US_OPTION"); err != nil {
+			return err
+		}
 		count, _ := cmd.Flags().GetInt("count")
-		return doDataGet("/openapi/market-data/option/tick", map[string]string{
+		if count <= 0 || count > 1200 {
+			return fmt.Errorf("count must be between 1 and 1200")
+		}
+		return doDataGet("/market-data/options/ticks/list", map[string]string{
 			"symbol": symbol, "category": category, "count": fmt.Sprintf("%d", count),
 		})
 	},
@@ -710,7 +742,7 @@ var dataOptionTickCmd = &cobra.Command{
 func init() {
 	dataOptionTickCmd.Flags().String("symbol", "", "Option symbol (required)")
 	dataOptionTickCmd.Flags().String("category", "US_OPTION", "Category: US_OPTION")
-	dataOptionTickCmd.Flags().Int("count", 50, "Number of ticks")
+	dataOptionTickCmd.Flags().Int("count", 30, "Number of ticks (1-1200)")
 	dataOptionTickCmd.MarkFlagRequired("symbol")
 }
 
