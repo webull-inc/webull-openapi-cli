@@ -57,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(dataCmd)
 	rootCmd.AddCommand(instrumentCmd)
 	rootCmd.AddCommand(watchlistCmd)
+	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(doctorCmd)
 }
