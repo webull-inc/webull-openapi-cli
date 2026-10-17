@@ -12,6 +12,7 @@ const (
 	RegionHK Region = "hk"
 	RegionJP Region = "jp"
 	RegionSG Region = "sg"
+	RegionTH Region = "th"
 	RegionMY Region = "my"
 	RegionUK Region = "uk"
 	RegionBR Region = "br"
@@ -21,11 +22,11 @@ const (
 
 // ValidRegions is the list of currently supported regions.
 //
-// Note: TH, EU, and AU are not supported yet due to compliance
+// Note: EU and AU are not supported yet due to compliance
 // requirements, so they are intentionally omitted here and fail IsValid.
 // To enable a region later, add its constant back to this list.
 var ValidRegions = []Region{
-	RegionUS, RegionHK, RegionJP, RegionSG,
+	RegionUS, RegionHK, RegionJP, RegionSG, RegionTH,
 	RegionMY, RegionUK, RegionBR, RegionMX, RegionZA,
 }
 
@@ -69,6 +70,7 @@ var defaultEndpoints = map[Region]RegionEndpoints{
 	RegionHK: {API: "api.webull.hk", Quotes: "data-api.webull.hk", Events: "events-api.webull.hk"},
 	RegionJP: {API: "api.webull.co.jp", Quotes: "data-api.webull.co.jp", Events: "events-api.webull.co.jp"},
 	RegionSG: {API: "api.webull.com.sg", Quotes: "data-api.webull.com.sg", Events: "events-api.webull.com.sg"},
+	RegionTH: {API: "api.webull.co.th", Quotes: "data-api.webull.co.th", Events: "events-api.webull.co.th"},
 	RegionMY: {API: "api.webull.com.my", Quotes: "data-api.webull.com.my", Events: "events-api.webull.com.my"},
 	RegionUK: {API: "api.webull-uk.com", Quotes: "data-api.webull-uk.com", Events: "events-api.webull-uk.com"},
 	RegionBR: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
