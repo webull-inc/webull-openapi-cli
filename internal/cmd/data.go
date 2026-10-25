@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/webull-inc/webull-openapi-cli/internal/auth"
 	"github.com/webull-inc/webull-openapi-cli/internal/client"
+	"github.com/webull-inc/webull-openapi-cli/internal/config"
 	"github.com/webull-inc/webull-openapi-cli/internal/output"
 )
 
@@ -26,6 +29,7 @@ var dataFuturesCmd = &cobra.Command{Use: "futures", Short: "Futures market data"
 var dataCryptoCmd = &cobra.Command{Use: "crypto", Short: "Crypto market data"}
 var dataEventCmd = &cobra.Command{Use: "event", Short: "Event contract market data"}
 var dataScreenerCmd = &cobra.Command{Use: "screener", Short: "Stock screener (gainers/losers, most active)"}
+var data13FCmd = &cobra.Command{Use: "13f", Short: "US 13F data (institutions, holdings, transactions)"}
 
 // Top-level init: register sub-commands only
 func init() {
@@ -44,6 +48,9 @@ func init() {
 	dataStockCmd.AddCommand(dataStockFootprintCmd)
 	dataStockCmd.AddCommand(dataStockNoiiBarsCmd)
 	dataStockCmd.AddCommand(dataStockNoiiSnapshotCmd)
+	data13FCmd.AddCommand(data13FInstitutionsSearchCmd)
+	data13FCmd.AddCommand(data13FHoldingsCmd)
+	data13FCmd.AddCommand(data13FTransactionsCmd)
 
 	dataScreenerCmd.AddCommand(dataScreenerMoversCmd)
 	dataScreenerCmd.AddCommand(dataScreenerActivesCmd)
@@ -321,6 +328,266 @@ func init() {
 	dataStockNoiiSnapshotCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
 	dataStockNoiiSnapshotCmd.Flags().String("action-type", "PRE_OPEN", "Imbalance type: PRE_OPEN, PRE_CLOSE")
 	dataStockNoiiSnapshotCmd.MarkFlagRequired("symbol")
+}
+
+var dataMarketSentimentCmd = &cobra.Command{
+	Use: "market-sentiment", Short: "US market fear and greed sentiment index",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return doUSDataGet("/market-data/screeners/fear-greed-indexes/get", map[string]string{
+			"category": "US_STOCK",
+		})
+	},
+}
+
+var dataUnusualActivitiesCmd = &cobra.Command{
+	Use: "unusual-activities", Short: "US stock unusual activity alerts",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		symbol, _ := cmd.Flags().GetString("symbol")
+		count, _ := cmd.Flags().GetInt("count")
+		alertTypes, _ := cmd.Flags().GetString("alert-types")
+		extendedHours, _ := cmd.Flags().GetBool("extended-hours")
+		if count < 1 || count > 30 {
+			return fmt.Errorf("count must be between 1 and 30")
+		}
+		q := map[string]string{
+			"category": "US_STOCK", "count": fmt.Sprintf("%d", count),
+			"extended_hours_required": fmt.Sprintf("%t", extendedHours),
+		}
+		if symbol != "" {
+			q["symbol"] = symbol
+		}
+		if alertTypes != "" {
+			q["alert_types"] = alertTypes
+		}
+		return doUSDataGet("/market-data/screeners/unusual-activities/list", q)
+	},
+}
+
+var data13FInstitutionsSearchCmd = &cobra.Command{
+	Use: "search", Short: "Search US institutional investors",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		keyword, _ := cmd.Flags().GetString("keyword")
+		keyword = strings.TrimSpace(keyword)
+		if keyword == "" {
+			return fmt.Errorf("keyword must not be empty")
+		}
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{"keyword": keyword}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/fundamentals/institutions/list", q)
+	},
+}
+
+var data13FHoldingsCmd = &cobra.Command{
+	Use: "holdings", Short: "Get US institution 13F holdings",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cik, _ := cmd.Flags().GetString("cik")
+		cik = strings.TrimSpace(cik)
+		if cik == "" {
+			return fmt.Errorf("cik must not be empty")
+		}
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{"cik": cik}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/fundamentals/institutions/holdings/list", q)
+	},
+}
+
+var data13FTransactionsCmd = &cobra.Command{
+	Use: "transactions", Short: "Get US institution holding changes",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cik, _ := cmd.Flags().GetString("cik")
+		cik = strings.TrimSpace(cik)
+		if cik == "" {
+			return fmt.Errorf("cik must not be empty")
+		}
+		position, _ := cmd.Flags().GetString("position")
+		position = strings.ToUpper(strings.TrimSpace(position))
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		if position != "OPEN" && position != "CLOSE" && position != "CHANGE" {
+			return fmt.Errorf("position must be one of OPEN, CLOSE, CHANGE")
+		}
+		q := map[string]string{"cik": cik, "position": position}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/fundamentals/institutions/holding-changes/list", q)
+	},
+}
+
+var dataStockInsiderTransactionsCmd = &cobra.Command{
+	Use: "insider-transactions", Short: "Get US insider transactions",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		symbol, _ := cmd.Flags().GetString("symbol")
+		symbol = strings.TrimSpace(symbol)
+		if symbol == "" {
+			return fmt.Errorf("symbol must not be empty")
+		}
+		side, _ := cmd.Flags().GetString("side")
+		side = strings.ToUpper(strings.TrimSpace(side))
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		if side != "" && side != "BUY" && side != "SELL" {
+			return fmt.Errorf("side must be BUY or SELL")
+		}
+		q := map[string]string{"symbol": symbol, "category": "US_STOCK"}
+		if side != "" {
+			q["side"] = side
+		}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/fundamentals/insider-transactions/list", q)
+	},
+}
+
+var dataStockInsiderHoldingsOverviewCmd = &cobra.Command{
+	Use: "insider-holdings-overview", Short: "Get US insider ownership overview",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		symbol, _ := cmd.Flags().GetString("symbol")
+		symbol = strings.TrimSpace(symbol)
+		if symbol == "" {
+			return fmt.Errorf("symbol must not be empty")
+		}
+		compareMonths, _ := cmd.Flags().GetInt("compare-months")
+		if compareMonths != 1 && compareMonths != 3 {
+			return fmt.Errorf("compare-months must be 1 or 3")
+		}
+		return doUSDataGet("/market-data/fundamentals/insider-holdings/get", map[string]string{
+			"symbol": symbol, "compare_months": fmt.Sprintf("%d", compareMonths), "category": "US_STOCK",
+		})
+	},
+}
+
+var dataEconomicCalendarCmd = &cobra.Command{
+	Use: "economic-calendar", Short: "Get the US macroeconomic calendar",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		startDate, _ := cmd.Flags().GetString("start-date")
+		endDate, _ := cmd.Flags().GetString("end-date")
+		q := map[string]string{"region": "US"}
+		if startDate != "" {
+			q["start_date"] = startDate
+		}
+		if endDate != "" {
+			q["end_date"] = endDate
+		}
+		return doUSDataGet("/market-data/fundamentals/economic-calendars/list", q)
+	},
+}
+
+var dataNewsCmd = &cobra.Command{Use: "news", Short: "US market news (search, detail, stock news)"}
+
+var dataNewsSearchCmd = &cobra.Command{
+	Use: "search", Short: "Search US market news by keyword",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		keyword := strings.TrimSpace(cmd.Flags().Lookup("keyword").Value.String())
+		startDate, _ := cmd.Flags().GetString("start-date")
+		endDate, _ := cmd.Flags().GetString("end-date")
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		if keyword == "" {
+			return fmt.Errorf("keyword must not be empty")
+		}
+		if len(keyword) > 100 {
+			return fmt.Errorf("keyword must not exceed 100 characters")
+		}
+		q := map[string]string{"keyword": keyword}
+		if startDate != "" {
+			q["start_date"] = startDate
+		}
+		if endDate != "" {
+			q["end_date"] = endDate
+		}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/news/search/list", q)
+	},
+}
+
+var dataNewsDetailCmd = &cobra.Command{
+	Use: "detail", Short: "Get full US news content by ID",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		newsID := strings.TrimSpace(cmd.Flags().Lookup("news-id").Value.String())
+		if newsID == "" {
+			return fmt.Errorf("news-id must not be empty")
+		}
+		return doUSDataGet("/market-data/news/detail/get", map[string]string{"news_id": newsID})
+	},
+}
+
+var dataStockNewsCmd = &cobra.Command{
+	Use: "stock-news", Short: "Get US stock-related news list",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		symbol := strings.TrimSpace(cmd.Flags().Lookup("symbol").Value.String())
+		sentiment := strings.ToUpper(strings.TrimSpace(cmd.Flags().Lookup("sentiment").Value.String()))
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		if symbol == "" {
+			return fmt.Errorf("symbol must not be empty")
+		}
+		if sentiment != "" && sentiment != "POSITIVE" && sentiment != "NEGATIVE" && sentiment != "NEUTRAL" {
+			return fmt.Errorf("sentiment must be one of POSITIVE, NEGATIVE, NEUTRAL")
+		}
+		q := map[string]string{"symbol": symbol, "category": "US_STOCK"}
+		if sentiment != "" {
+			q["sentiment"] = sentiment
+		}
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doUSDataGet("/market-data/news/stock-news/list", q)
+	},
+}
+
+func init() {
+	dataStockCmd.AddCommand(dataUnusualActivitiesCmd)
+	dataStockCmd.AddCommand(dataStockInsiderTransactionsCmd)
+	dataStockCmd.AddCommand(dataStockInsiderHoldingsOverviewCmd)
+	dataStockCmd.AddCommand(dataEconomicCalendarCmd)
+	dataCmd.AddCommand(data13FCmd)
+	dataCmd.AddCommand(dataMarketSentimentCmd)
+	dataCmd.AddCommand(dataNewsCmd)
+	dataNewsCmd.AddCommand(dataNewsSearchCmd)
+	dataNewsCmd.AddCommand(dataNewsDetailCmd)
+	dataNewsCmd.AddCommand(dataStockNewsCmd)
+
+	dataUnusualActivitiesCmd.Flags().String("symbol", "", "Symbol")
+	dataUnusualActivitiesCmd.Flags().Int("count", 10, "Number of activities (1-30)")
+	dataUnusualActivitiesCmd.Flags().String("alert-types", "", "Comma-separated alert types")
+	dataUnusualActivitiesCmd.Flags().Bool("extended-hours", false, "Include pre-market and after-hours alerts")
+	data13FInstitutionsSearchCmd.Flags().String("keyword", "", "Institution name or CIK (required)")
+	data13FInstitutionsSearchCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	data13FInstitutionsSearchCmd.MarkFlagRequired("keyword")
+	data13FHoldingsCmd.Flags().String("cik", "", "Institution CIK (required)")
+	data13FHoldingsCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	data13FHoldingsCmd.MarkFlagRequired("cik")
+	data13FTransactionsCmd.Flags().String("cik", "", "Institution CIK (required)")
+	data13FTransactionsCmd.Flags().String("position", "", "Position: OPEN, CLOSE, CHANGE (required)")
+	data13FTransactionsCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	data13FTransactionsCmd.MarkFlagRequired("cik")
+	data13FTransactionsCmd.MarkFlagRequired("position")
+	dataStockInsiderTransactionsCmd.Flags().String("symbol", "", "Symbol (required)")
+	dataStockInsiderTransactionsCmd.Flags().String("side", "", "Side: BUY or SELL")
+	dataStockInsiderTransactionsCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	dataStockInsiderTransactionsCmd.MarkFlagRequired("symbol")
+	dataStockInsiderHoldingsOverviewCmd.Flags().String("symbol", "", "Symbol (required)")
+	dataStockInsiderHoldingsOverviewCmd.Flags().Int("compare-months", 1, "Comparison period: 1 or 3 months")
+	dataStockInsiderHoldingsOverviewCmd.MarkFlagRequired("symbol")
+	dataEconomicCalendarCmd.Flags().String("start-date", "", "Start date yyyy-MM-dd")
+	dataEconomicCalendarCmd.Flags().String("end-date", "", "End date yyyy-MM-dd")
+	dataNewsSearchCmd.Flags().String("keyword", "", "Search keyword, max 100 chars (required)")
+	dataNewsSearchCmd.Flags().String("start-date", "", "Start date yyyy-MM-dd")
+	dataNewsSearchCmd.Flags().String("end-date", "", "End date yyyy-MM-dd")
+	dataNewsSearchCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	dataNewsSearchCmd.MarkFlagRequired("keyword")
+	dataNewsDetailCmd.Flags().String("news-id", "", "News unique identifier (required)")
+	dataNewsDetailCmd.MarkFlagRequired("news-id")
+	dataStockNewsCmd.Flags().String("symbol", "", "Symbol (required)")
+	dataStockNewsCmd.Flags().String("sentiment", "", "Sentiment: POSITIVE, NEGATIVE, NEUTRAL")
+	dataStockNewsCmd.Flags().String("pagination-key", "", "Pagination cursor")
+	dataStockNewsCmd.MarkFlagRequired("symbol")
 }
 
 // ==================== Screener ====================
@@ -698,11 +965,76 @@ func init() {
 
 // ==================== Helper ====================
 
+func newUSDataClient() (*client.APIClient, error) {
+	pm := config.NewProfileManager("")
+	profile, err := pm.GetActive()
+	if err != nil {
+		return nil, err
+	}
+
+	region := profile.Region
+	if flagRegion != "" {
+		region = config.Region(strings.ToLower(strings.TrimSpace(flagRegion)))
+	}
+	if !region.IsValid() {
+		return nil, fmt.Errorf("unsupported region %q", region)
+	}
+	if region != config.RegionUS {
+		return nil, fmt.Errorf("this market-data action is only supported in region 'us'")
+	}
+
+	effectiveProfile := *profile
+	effectiveProfile.Region = region
+
+	var appKey, appSecret, token string
+	if envKey, envSecret, ok := config.EnvCredentials(); ok {
+		appKey = envKey
+		appSecret = envSecret
+	} else {
+		cred, err := config.LoadCredential(effectiveProfile.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load credentials: %w. Run 'webull auth login' to re-authenticate", err)
+		}
+		appKey = cred.AppKey
+		appSecret = cred.AppSecret
+		token = cred.Token
+	}
+
+	envOverrides := config.EnvEndpointOverrides()
+	var overrides *config.RegionEndpoints
+	if effectiveProfile.Endpoints.API != "" {
+		overrides = &config.RegionEndpoints{API: effectiveProfile.Endpoints.API}
+	}
+	endpoints := config.GetEndpoints(region, overrides)
+	if envOverrides != nil && envOverrides.API != "" {
+		endpoints.API = envOverrides.API
+	}
+
+	provider := auth.NewAkSkProvider(&effectiveProfile, pm, appKey, appSecret, token)
+	apiClient := client.NewAPIClient(provider, endpoints, time.Duration(flagTimeout)*time.Second)
+	apiClient.SetVerbose(flagVerbose)
+	apiClient.SetDebug(flagDebug)
+	return apiClient, nil
+}
+
+func doUSDataGet(path string, query map[string]string) error {
+	cl, err := newUSDataClient()
+	if err != nil {
+		output.PrintError("CONFIG_ERROR", err.Error(), 0)
+		return err
+	}
+	return doDataGetWithClient(cl, path, query)
+}
+
 func doDataGet(path string, query map[string]string) error {
 	cl, err := newAPIClient()
 	if err != nil {
 		return err
 	}
+	return doDataGetWithClient(cl, path, query)
+}
+
+func doDataGetWithClient(cl *client.APIClient, path string, query map[string]string) error {
 	resp, err := cl.Do(context.Background(), "GET", path, &client.RequestOptions{
 		Query: query,
 	})

@@ -161,6 +161,17 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull data stock footprint` | Large order footprint |
 | `webull data stock noii-bars` | NOII (Net Order Imbalance) bars |
 | `webull data stock noii-snapshot` | NOII snapshot |
+| `webull data market-sentiment` | US market fear & greed sentiment index (US only) |
+| `webull data stock unusual-activities` | US stock unusual activity alerts (US only) |
+| `webull data stock insider-transactions` | US insider transactions (US only) |
+| `webull data stock insider-holdings-overview` | US insider ownership overview (US only) |
+| `webull data stock economic-calendar` | US macroeconomic calendar (US only) |
+| `webull data 13f search` | Search US institutions (US only) |
+| `webull data 13f holdings` | Institution 13F holdings (US only) |
+| `webull data 13f transactions` | Institution holding changes (US only) |
+| `webull data news search` | Search US market news by keyword (US only) |
+| `webull data news detail` | Get full US news content by ID (US only) |
+| `webull data news stock-news` | US stock-related news list (US only) |
 | `webull data option snapshot` | Option real-time snapshot |
 | `webull data option bars` | Option historical bars |
 | `webull data option tick` | Option tick data |
@@ -234,6 +245,17 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull watchlist add` | Add instruments (JSON) |
 | `webull watchlist remove` | Remove instruments |
 | `webull watchlist sort` | Update instruments sort order |
+
+### Community (`webull community`) — US only
+
+| Command | Description |
+|---------|-------------|
+| `webull community post create` | Create a plain-text post (optional `--symbol` + `--category`) |
+| `webull community comment create` | Create a comment on a post |
+| `webull community hot-stocks` | List stocks ranked by community activity |
+| `webull community post by-symbol` | List posts associated with a symbol |
+| `webull community post get` | Get post detail |
+| `webull community my-posts` | List posts created by the current user |
 
 ### Account
 
