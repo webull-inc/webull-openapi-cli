@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 )
 
-// AkSkCredentials holds AK/SK authentication data.
 // AkSkCredentials holds non-sensitive AK/SK metadata.
 // Sensitive data (app_key, app_secret, token) is stored in system keychain.
 type AkSkCredentials struct {
