@@ -87,6 +87,7 @@ var orderStockSubmitCmd = &cobra.Command{
 		trailingStep, _ := cmd.Flags().GetString("trailing-stop-step")
 		accountTaxType, _ := cmd.Flags().GetString("account-tax-type")
 		marginType, _ := cmd.Flags().GetString("margin-type")
+		tradeCurrency, _ := cmd.Flags().GetString("trade-currency")
 		positionIntent, _ := cmd.Flags().GetString("position-intent")
 		closeContracts, _ := cmd.Flags().GetString("close-contracts")
 		algoType, _ := cmd.Flags().GetString("algo-type")
@@ -144,6 +145,9 @@ var orderStockSubmitCmd = &cobra.Command{
 		}
 		if marginType != "" {
 			ob["margin_type"] = marginType
+		}
+		if tradeCurrency != "" {
+			ob["trade_currency"] = tradeCurrency
 		}
 		if positionIntent != "" {
 			ob["position_intent"] = positionIntent
@@ -215,6 +219,7 @@ func init() {
 	orderStockSubmitCmd.Flags().String("trigger-price-type", "", "Trigger price type: PRICE, PRICE_BID, PRICE_ASK")
 	orderStockSubmitCmd.Flags().String("account-tax-type", "", "Account tax type (JP only): SPECIFIC, GENERAL")
 	orderStockSubmitCmd.Flags().String("margin-type", "", "Margin type (JP only): CASH, MARGIN_STANDARD, MARGIN_NEGOTIABLE, MARGIN_DAY")
+	orderStockSubmitCmd.Flags().String("trade-currency", "", "Order settlement currency (JP only): USD, JPY. Required for CASH accounts, optional for MARGIN accounts")
 	orderStockSubmitCmd.Flags().String("position-intent", "", "Position intent: BUY_TO_OPEN, BUY_TO_CLOSE, SELL_TO_OPEN, SELL_TO_CLOSE")
 	orderStockSubmitCmd.Flags().String("close-contracts", "", "Close contracts JSON array (JP only), e.g. '[{\"contract_id\":\"x\",\"quantity\":\"10\"}]'")
 	orderStockSubmitCmd.Flags().String("algo-type", "", "Algorithm type: TWAP, VWAP, POV (algo orders only)")
@@ -245,6 +250,7 @@ var orderStockPreviewCmd = &cobra.Command{
 		clientOrderID, _ := cmd.Flags().GetString("client-order-id")
 		accountTaxType, _ := cmd.Flags().GetString("account-tax-type")
 		marginType, _ := cmd.Flags().GetString("margin-type")
+		tradeCurrency, _ := cmd.Flags().GetString("trade-currency")
 		closeContracts, _ := cmd.Flags().GetString("close-contracts")
 		if clientOrderID == "" {
 			clientOrderID = fmt.Sprintf("cli_stock_preview_%d", time.Now().UnixMilli())
@@ -269,6 +275,9 @@ var orderStockPreviewCmd = &cobra.Command{
 		}
 		if marginType != "" {
 			ob["margin_type"] = marginType
+		}
+		if tradeCurrency != "" {
+			ob["trade_currency"] = tradeCurrency
 		}
 		if closeContracts != "" {
 			var contracts []interface{}
@@ -297,6 +306,7 @@ func init() {
 	orderStockPreviewCmd.Flags().String("client-order-id", "", "Custom order ID")
 	orderStockPreviewCmd.Flags().String("account-tax-type", "", "Account tax type (JP only): SPECIFIC, GENERAL")
 	orderStockPreviewCmd.Flags().String("margin-type", "", "Margin type (JP only)")
+	orderStockPreviewCmd.Flags().String("trade-currency", "", "Order settlement currency (JP only): USD, JPY. Required for CASH accounts, optional for MARGIN accounts")
 	orderStockPreviewCmd.Flags().String("close-contracts", "", "Close contracts JSON array (JP only)")
 	orderStockPreviewCmd.MarkFlagRequired("account-id")
 	orderStockPreviewCmd.MarkFlagRequired("symbol")
