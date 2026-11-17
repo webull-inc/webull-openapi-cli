@@ -121,6 +121,41 @@ func TestValidateOptionStrategyOrderBody(t *testing.T) {
 	}
 }
 
+func replaceLegBody(legCount int) map[string]interface{} {
+	order := map[string]interface{}{"client_order_id": "cli1"}
+	if legCount >= 0 {
+		legs := make([]interface{}, 0, legCount)
+		for i := 0; i < legCount; i++ {
+			legs = append(legs, map[string]interface{}{"id": "L", "quantity": "1"})
+		}
+		order["legs"] = legs
+	}
+	return map[string]interface{}{"account_id": "ACC1", "modify_orders": []interface{}{order}}
+}
+
+func TestValidateOptionReplaceLegScope(t *testing.T) {
+	noLegs := map[string]interface{}{"account_id": "ACC1", "modify_orders": []interface{}{map[string]interface{}{"client_order_id": "cli1"}}}
+	tests := []struct {
+		name    string
+		region  config.Region
+		body    map[string]interface{}
+		wantErr string
+	}{
+		{name: "us multi-leg passes through", region: config.RegionUS, body: replaceLegBody(4)},
+		{name: "us single leg", region: config.RegionUS, body: replaceLegBody(1)},
+		{name: "hk single leg", region: config.RegionHK, body: replaceLegBody(1)},
+		{name: "hk no legs", region: config.RegionHK, body: noLegs},
+		{name: "hk two legs rejected", region: config.RegionHK, body: replaceLegBody(2), wantErr: "only supported in region 'us'"},
+		{name: "th two legs rejected", region: config.RegionTH, body: replaceLegBody(2), wantErr: "only supported in region 'us'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateOptionReplaceLegScope(tt.body, tt.region)
+			checkError(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestActiveOptionRegion(t *testing.T) {
 	for _, tt := range []struct {
 		region  string
@@ -142,7 +177,7 @@ func TestActiveOptionRegion(t *testing.T) {
 			if err := os.MkdirAll(dir, 0700); err != nil {
 				t.Fatal(err)
 			}
-			profiles := `{"version":"1.0","active_profile":"default","profiles":{"default":{"name":"default","auth_method":"ak_sk","region":"` + tt.region + `","env":"prod"}}}`
+			profiles := `{"version":"2.0","profile":{"auth_method":"ak_sk","region":"` + tt.region + `","env":"prod"}}`
 			if err := os.WriteFile(filepath.Join(dir, "profiles.json"), []byte(profiles), 0600); err != nil {
 				t.Fatal(err)
 			}

@@ -44,12 +44,14 @@ func (r Region) IsValid() bool {
 type ApiModule string
 
 const (
-	ModuleAPI    ApiModule = "api"
-	ModuleQuotes ApiModule = "quotes-api"
-	ModuleEvents ApiModule = "events-api"
+	ModuleAPI ApiModule = "api"
 )
 
 // Environment identifies a deployment environment.
+//
+// prod maps to each region's production Trading API host.
+// uat maps to the test host (sandbox for regions that have one, uat otherwise);
+// for the CLI both are treated as the single non-production environment.
 type Environment string
 
 const (
@@ -57,40 +59,58 @@ const (
 	EnvUAT  Environment = "uat"
 )
 
-// RegionEndpoints holds the three endpoints for a region.
-type RegionEndpoints struct {
-	API    string
-	Quotes string
-	Events string
+// prodAPIEndpoints maps region to its production Trading API host.
+var prodAPIEndpoints = map[Region]string{
+	RegionUS: "api.webull.com",
+	RegionHK: "api.webull.hk",
+	RegionJP: "api.webull.co.jp",
+	RegionSG: "api.webull.com.sg",
+	RegionTH: "api.webull.co.th",
+	// RegionAU: "api.webull.com.au", // not supported yet (compliance); re-add the region constant to enable
+	RegionMY: "api.webull.com.my",
+	RegionUK: "api.webull-uk.com",
+	RegionBR: "api.webull.com",
+	RegionMX: "api.webull.com",
+	// RegionEU: "api.webull.eu",     // not supported yet (compliance); re-add the region constant to enable
+	RegionZA: "api.webull.com.au",
 }
 
-// defaultEndpoints maps region to production endpoints.
-var defaultEndpoints = map[Region]RegionEndpoints{
-	RegionUS: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
-	RegionHK: {API: "api.webull.hk", Quotes: "data-api.webull.hk", Events: "events-api.webull.hk"},
-	RegionJP: {API: "api.webull.co.jp", Quotes: "data-api.webull.co.jp", Events: "events-api.webull.co.jp"},
-	RegionSG: {API: "api.webull.com.sg", Quotes: "data-api.webull.com.sg", Events: "events-api.webull.com.sg"},
-	RegionTH: {API: "api.webull.co.th", Quotes: "data-api.webull.co.th", Events: "events-api.webull.co.th"},
-	RegionMY: {API: "api.webull.com.my", Quotes: "data-api.webull.com.my", Events: "events-api.webull.com.my"},
-	RegionUK: {API: "api.webull-uk.com", Quotes: "data-api.webull-uk.com", Events: "events-api.webull-uk.com"},
-	RegionBR: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
-	RegionMX: {API: "api.webull.com", Quotes: "data-api.webull.com", Events: "events-api.webull.com"},
-	RegionZA: {API: "api.webull.com.au", Quotes: "data-api.webull.com.au", Events: "events-api.webull.com.au"},
+// uatAPIEndpoints maps region to its test Trading API host.
+// US/HK expose a dedicated sandbox; the remaining regions use uat.
+var uatAPIEndpoints = map[Region]string{
+	RegionUS: "api.sandbox.webull.com",
+	RegionHK: "api.sandbox.webull.hk",
+	RegionJP: "jp-openapi-alb.uat.webullbroker.com",
+	RegionSG: "sg-api.uat.webullbroker.com",
+	RegionTH: "th-api.uat.webullbroker.com",
+	// RegionAU: "au-api.uat.webullbroker.com", // not supported yet (compliance); re-add the region constant to enable
+	RegionMY: "my-api.uat.webullbroker.com",
+	RegionUK: "uk-api.uat.webullbroker.com",
+	RegionBR: "us-openapi-alb.uat.webullbroker.com",
+	RegionMX: "us-openapi-alb.uat.webullbroker.com",
+	// RegionEU: "eu-api.uat.webullbroker.com", // not supported yet (compliance); re-add the region constant to enable
+	RegionZA: "au-api.uat.webullbroker.com",
 }
 
-// GetEndpoints resolves endpoints for a region, applying overrides.
-func GetEndpoints(region Region, overrides *RegionEndpoints) RegionEndpoints {
-	ep := defaultEndpoints[region]
-	if overrides != nil {
-		if overrides.API != "" {
-			ep.API = overrides.API
-		}
-		if overrides.Quotes != "" {
-			ep.Quotes = overrides.Quotes
-		}
-		if overrides.Events != "" {
-			ep.Events = overrides.Events
-		}
+// defaultAPIEndpoint returns the hardcoded Trading API host for a region/env.
+func defaultAPIEndpoint(region Region, env Environment) string {
+	if env == EnvProd {
+		return prodAPIEndpoints[region]
 	}
-	return ep
+	return uatAPIEndpoints[region]
+}
+
+// ResolveAPIEndpoint resolves the Trading API host for a region/env.
+//
+// Resolution rules:
+//   - prod: always the hardcoded production host; the file override is ignored.
+//   - uat:  the file override wins when non-empty, otherwise the hardcoded uat host.
+//
+// The override is the endpoints.api value persisted in profiles.json. It exists
+// as an internal testing backdoor and is not configurable via CLI flags.
+func ResolveAPIEndpoint(region Region, env Environment, override string) string {
+	if env == EnvUAT && override != "" {
+		return override
+	}
+	return defaultAPIEndpoint(region, env)
 }

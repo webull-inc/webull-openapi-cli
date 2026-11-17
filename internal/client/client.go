@@ -12,17 +12,18 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/webull-inc/webull-openapi-cli/internal/auth"
-	"github.com/webull-inc/webull-openapi-cli/internal/config"
 )
 
 // APIClient is the HTTP client that handles signing, retries, and requests.
 type APIClient struct {
 	httpClient *http.Client
 	provider   auth.CredentialProvider
-	endpoints  config.RegionEndpoints
+	host       string
+	authMethod string
 	verbose    bool
 	debug      bool
 }
@@ -32,14 +33,17 @@ const (
 	defaultClientSource = "cli"
 	// clientSourceEnv allows overriding the client source via environment variable.
 	clientSourceEnv = "WEBULL_CLIENT_SOURCE"
+	// oauthPathPrefix is prepended to all API paths for OAuth-authenticated requests.
+	oauthPathPrefix = "/openapi-oauth-cli"
 )
 
-// NewAPIClient creates a new API client.
-func NewAPIClient(provider auth.CredentialProvider, endpoints config.RegionEndpoints, timeout time.Duration) *APIClient {
+// NewAPIClient creates a new API client bound to a single Trading API host.
+func NewAPIClient(provider auth.CredentialProvider, host string, timeout time.Duration, authMethod string) *APIClient {
 	return &APIClient{
 		httpClient: &http.Client{Timeout: timeout},
 		provider:   provider,
-		endpoints:  endpoints,
+		host:       host,
+		authMethod: authMethod,
 	}
 }
 
@@ -51,9 +55,8 @@ func (c *APIClient) SetDebug(d bool) { c.debug = d }
 
 // RequestOptions holds options for an API request.
 type RequestOptions struct {
-	Module config.ApiModule
-	Query  map[string]string
-	Body   interface{}
+	Query map[string]string
+	Body  interface{}
 }
 
 // Response holds the API response.
@@ -69,11 +72,22 @@ func (c *APIClient) Do(ctx context.Context, method, path string, opts *RequestOp
 		opts = &RequestOptions{}
 	}
 
-	// Resolve host based on module
-	host := c.resolveHost(opts.Module)
+	host := c.host
 
-	// Build URL
-	url := fmt.Sprintf("https://%s%s", host, path)
+	// For OAuth auth, prepend the path prefix for gateway routing
+	actualPath := path
+	if c.authMethod == "oauth" {
+		actualPath = oauthPathPrefix + path
+	}
+
+	// Build URL. Default scheme is https; if the host already carries an
+	// explicit scheme (e.g. an override endpoint), use it as-is.
+	var url string
+	if strings.HasPrefix(host, "http://") || strings.HasPrefix(host, "https://") {
+		url = host + actualPath
+	} else {
+		url = fmt.Sprintf("https://%s%s", host, actualPath)
+	}
 
 	// Serialize body
 	var bodyBytes []byte
@@ -205,17 +219,6 @@ func (c *APIClient) doWithRetry(ctx context.Context, req *http.Request, method s
 		return resp, nil
 	}
 	return nil, lastErr
-}
-
-func (c *APIClient) resolveHost(module config.ApiModule) string {
-	switch module {
-	case config.ModuleQuotes:
-		return c.endpoints.Quotes
-	case config.ModuleEvents:
-		return c.endpoints.Events
-	default:
-		return c.endpoints.API
-	}
 }
 
 func sleepWithBackoff(ctx context.Context, attempt int) {

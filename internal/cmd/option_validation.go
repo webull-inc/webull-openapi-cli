@@ -1,4 +1,6 @@
 // Licensed under the Apache License, Version 2.0.
+// Copyright 2024-2026 Webull Inc. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
 // See LICENSE file in the project root for full license information.
 
 package cmd
@@ -12,6 +14,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/webull-inc/webull-openapi-cli/internal/config"
+)
+
+const (
+	// maxClientOrderIDLen is the maximum length the server accepts for a client order ID.
+	maxClientOrderIDLen = 32
+	// maxPaginationKeyLen is the maximum length the server accepts for a pagination cursor.
+	maxPaginationKeyLen = 500
 )
 
 var (
@@ -30,6 +39,8 @@ func validateEnum(name, value string, allowed ...string) error {
 	return fmt.Errorf("invalid %s %q; allowed values: %s", name, value, strings.Join(allowed, ", "))
 }
 
+// validatePositiveDecimal validates that value is a positive decimal. When integer is true the
+// value must also be a whole number (no fractional part).
 func validatePositiveDecimal(name, value string, integer bool) error {
 	if !decimalPattern.MatchString(value) {
 		return fmt.Errorf("%s must be a positive decimal number", name)
@@ -80,8 +91,8 @@ func validateSymbols(name, value string, maximum int) error {
 }
 
 func validatePaginationKey(value string) error {
-	if len(value) > 500 {
-		return fmt.Errorf("pagination key must not exceed 500 characters")
+	if len(value) > maxPaginationKeyLen {
+		return fmt.Errorf("pagination key must not exceed %d characters", maxPaginationKeyLen)
 	}
 	return nil
 }
@@ -112,8 +123,8 @@ func validateClientOrderID(value string) error {
 	if value == "" {
 		return nil
 	}
-	if len(value) > 32 || !clientOrderIDPattern.MatchString(value) {
-		return fmt.Errorf("client order ID must be at most 32 characters and contain only letters, digits, underscores, or hyphens")
+	if len(value) > maxClientOrderIDLen || !clientOrderIDPattern.MatchString(value) {
+		return fmt.Errorf("client order ID must be at most %d characters and contain only letters, digits, underscores, or hyphens", maxClientOrderIDLen)
 	}
 	return nil
 }
@@ -246,14 +257,17 @@ func requireStringField(value map[string]interface{}, field string) (string, err
 	return result, nil
 }
 
+// requireObjectList requires field to be a JSON array holding exactly count objects.
 func requireObjectList(value map[string]interface{}, field string, count int) ([]interface{}, error) {
 	result, ok := value[field].([]interface{})
 	if !ok || len(result) != count {
-		return nil, fmt.Errorf("%s must contain exactly %d item", field, count)
+		return nil, fmt.Errorf("%s must contain exactly %d item(s)", field, count)
 	}
 	return result, nil
 }
 
+// optionalStringField returns field as a string. A missing field yields "" with no error, but a
+// present field must be a non-empty string.
 func optionalStringField(value map[string]interface{}, field string) (string, error) {
 	entry, exists := value[field]
 	if !exists {
@@ -278,19 +292,21 @@ func validateOptionOrderBody(body map[string]interface{}) error {
 	if !ok {
 		return fmt.Errorf("new_orders item must be an object")
 	}
-	for field, expected := range map[string]string{
-		"combo_type":      "NORMAL",
-		"option_strategy": "SINGLE",
-		"instrument_type": "OPTION",
-		"market":          "US",
-		"entrust_type":    "QTY",
+	// Keep a fixed order so the same invalid body always reports the same first error,
+	// which matters for the agent-first consumers described in the README.
+	for _, f := range []struct{ field, expected string }{
+		{"combo_type", "NORMAL"},
+		{"option_strategy", "SINGLE"},
+		{"instrument_type", "OPTION"},
+		{"market", "US"},
+		{"entrust_type", "QTY"},
 	} {
-		value, err := requireStringField(order, field)
+		value, err := requireStringField(order, f.field)
 		if err != nil {
 			return err
 		}
-		if value != expected {
-			return fmt.Errorf("%s must be %s for a single-leg US option order", field, expected)
+		if value != f.expected {
+			return fmt.Errorf("%s must be %s for a single-leg US option order", f.field, f.expected)
 		}
 	}
 	symbol, err := requireStringField(order, "symbol")
@@ -374,13 +390,16 @@ func validateOptionOrderBody(body map[string]interface{}) error {
 	if !ok {
 		return fmt.Errorf("option leg must be an object")
 	}
-	for field, expected := range map[string]string{"instrument_type": "OPTION", "market": "US"} {
-		value, err := requireStringField(leg, field)
+	for _, f := range []struct{ field, expected string }{
+		{"instrument_type", "OPTION"},
+		{"market", "US"},
+	} {
+		value, err := requireStringField(leg, f.field)
 		if err != nil {
 			return err
 		}
-		if value != expected {
-			return fmt.Errorf("option leg %s must be %s", field, expected)
+		if value != f.expected {
+			return fmt.Errorf("option leg %s must be %s", f.field, f.expected)
 		}
 	}
 	legSymbol, err := requireStringField(leg, "symbol")
@@ -423,6 +442,31 @@ func validateOptionOrderBody(body map[string]interface{}) error {
 		return err
 	}
 	return validateDate("option expiration date", expirationDate)
+}
+
+// validateOptionReplaceLegScope enforces the option-only region rule for JSON replace: region
+// 'us' may replace multi-leg orders, so the body is forwarded as-is; every other option region
+// supports single-leg orders only, so each modify order may carry at most one leg. It checks
+// only the leg count and leaves all other field validation to the server.
+func validateOptionReplaceLegScope(body map[string]interface{}, region config.Region) error {
+	if region == config.RegionUS {
+		return nil
+	}
+	orders, ok := body["modify_orders"].([]interface{})
+	if !ok {
+		return nil
+	}
+	for _, rawOrder := range orders {
+		order, ok := rawOrder.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		legs, ok := order["legs"].([]interface{})
+		if ok && len(legs) > 1 {
+			return fmt.Errorf("multi-leg option replace is only supported in region 'us'; region %q supports single-leg options only", region)
+		}
+	}
+	return nil
 }
 
 // validateOptionStrategyOrderBody validates a JSON option order body. In region 'us' the body

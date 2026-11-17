@@ -42,19 +42,22 @@ var instrumentStockCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		status, _ := cmd.Flags().GetString("status")
-		lastID, _ := cmd.Flags().GetString("last-instrument-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		q := map[string]string{"category": category, "page_size": fmt.Sprintf("%d", pageSize)}
+		subCategory, _ := cmd.Flags().GetString("sub-category")
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{"category": category}
 		if symbol != "" {
 			q["symbols"] = symbol
 		}
 		if status != "" {
 			q["status"] = status
 		}
-		if lastID != "" {
-			q["last_instrument_id"] = lastID
+		if subCategory != "" {
+			q["sub_category"] = subCategory
 		}
-		return doInstrumentGet("/openapi/instrument/stock/list", q)
+		if cursor != "" {
+			q["pagination_key"] = cursor
+		}
+		return doInstrumentGet("/trading/instruments/stocks/profiles/list", q)
 	},
 }
 
@@ -62,8 +65,8 @@ func init() {
 	instrumentStockCmd.Flags().String("symbol", "", "Symbol(s), comma-separated")
 	instrumentStockCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
 	instrumentStockCmd.Flags().String("status", "", "Status: OC, CO, NT")
-	instrumentStockCmd.Flags().String("last-instrument-id", "", "Last instrument ID for pagination")
-	instrumentStockCmd.Flags().Int("page-size", 1000, "Page size (max 1000)")
+	instrumentStockCmd.Flags().String("sub-category", "", "Sub-category (only effective when --symbol is not specified): COMMON_STOCK, ETF, PREFERRED_STOCK, WARRANT, UNITS, RIGHT")
+	instrumentStockCmd.Flags().String("pagination-key", "", "Pagination cursor")
 }
 
 var instrumentCryptoCmd = &cobra.Command{
@@ -72,19 +75,18 @@ var instrumentCryptoCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		status, _ := cmd.Flags().GetString("status")
-		lastID, _ := cmd.Flags().GetString("last-instrument-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		q := map[string]string{"category": category, "page_size": fmt.Sprintf("%d", pageSize)}
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{"category": category}
 		if symbol != "" {
 			q["symbols"] = symbol
 		}
 		if status != "" {
 			q["status"] = status
 		}
-		if lastID != "" {
-			q["last_instrument_id"] = lastID
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
-		return doInstrumentGet("/openapi/instrument/crypto/list", q)
+		return doInstrumentGet("/trading/instruments/crypto/profiles/list", q)
 	},
 }
 
@@ -92,8 +94,7 @@ func init() {
 	instrumentCryptoCmd.Flags().String("symbol", "", "Crypto symbol(s), comma-separated")
 	instrumentCryptoCmd.Flags().String("category", "US_CRYPTO", "Category: US_CRYPTO")
 	instrumentCryptoCmd.Flags().String("status", "", "Status: OC, CO, NT")
-	instrumentCryptoCmd.Flags().String("last-instrument-id", "", "Last instrument ID for pagination")
-	instrumentCryptoCmd.Flags().Int("page-size", 1000, "Page size (max 1000)")
+	instrumentCryptoCmd.Flags().String("pagination-key", "", "Pagination cursor")
 }
 
 var instrumentOptionCmd = &cobra.Command{
@@ -210,8 +211,8 @@ func init() {
 	instrumentOptionCmd.Flags().String("underlying-symbols", "", "Underlying symbols, comma-separated (maximum 20)")
 	instrumentOptionCmd.Flags().String("category", "US_OPTION", "Category: US_OPTION")
 	instrumentOptionCmd.Flags().String("status", "LISTING", "Contract status: LISTING, DELISTING")
-	instrumentOptionCmd.Flags().String("start-date", "", "Expiration date lower bound inclusive (YYYY-MM-DD)")
-	instrumentOptionCmd.Flags().String("end-date", "", "Expiration date upper bound inclusive (YYYY-MM-DD)")
+	instrumentOptionCmd.Flags().String("start-date", "", "Exact expiration date (YYYY-MM-DD)")
+	instrumentOptionCmd.Flags().String("end-date", "", "Expiration date lower bound, inclusive (YYYY-MM-DD)")
 	instrumentOptionCmd.Flags().String("root-symbol", "", "Root symbol or series symbol (for example, SPXW)")
 	instrumentOptionCmd.Flags().String("option-symbols", "", "Option symbols, comma-separated (maximum 20)")
 	instrumentOptionCmd.Flags().String("option-type", "", "Contract type: CALL, PUT")
@@ -240,7 +241,7 @@ var instrumentFuturesCmd = &cobra.Command{
 		if status != "" {
 			q["status"] = status
 		}
-		return doInstrumentGet("/openapi/instrument/futures/list", q)
+		return doInstrumentGet("/trading/instruments/futures/contracts/list", q)
 	},
 }
 
@@ -260,7 +261,7 @@ var instrumentFuturesProductsCmd = &cobra.Command{
 		if classID > 0 {
 			q["product_class_id"] = fmt.Sprintf("%d", classID)
 		}
-		return doInstrumentGet("/openapi/instrument/futures/products", q)
+		return doInstrumentGet("/trading/instruments/futures/product-codes/list", q)
 	},
 }
 
@@ -273,7 +274,7 @@ var instrumentFuturesClassCmd = &cobra.Command{
 	Use: "futures-class", Short: "Query futures product classification groups",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/futures/product-classes", map[string]string{"category": category})
+		return doInstrumentGet("/trading/instruments/futures/product-classes/list", map[string]string{"category": category})
 	},
 }
 
@@ -288,9 +289,8 @@ var instrumentEventCmd = &cobra.Command{
 		eventSymbol, _ := cmd.Flags().GetString("event-symbol")
 		symbol, _ := cmd.Flags().GetString("symbol")
 		expAfter, _ := cmd.Flags().GetString("expiration-date-after")
-		lastID, _ := cmd.Flags().GetString("last-instrument-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		q := map[string]string{"series_symbol": seriesSymbol, "page_size": fmt.Sprintf("%d", pageSize)}
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{"series_symbol": seriesSymbol}
 		if eventSymbol != "" {
 			q["event_symbol"] = eventSymbol
 		}
@@ -300,10 +300,10 @@ var instrumentEventCmd = &cobra.Command{
 		if expAfter != "" {
 			q["expiration_date_after"] = expAfter
 		}
-		if lastID != "" {
-			q["last_instrument_id"] = lastID
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
-		return doInstrumentGet("/openapi/instrument/event/market/list", q)
+		return doInstrumentGet("/trading/instruments/event-contracts/markets/list", q)
 	},
 }
 
@@ -312,15 +312,14 @@ func init() {
 	instrumentEventCmd.Flags().String("event-symbol", "", "Event symbol")
 	instrumentEventCmd.Flags().String("symbol", "", "Market symbol(s), comma-separated")
 	instrumentEventCmd.Flags().String("expiration-date-after", "", "Filter expiration after date (YYYY-MM-DD)")
-	instrumentEventCmd.Flags().String("last-instrument-id", "", "Last instrument ID for pagination")
-	instrumentEventCmd.Flags().Int("page-size", 500, "Page size")
+	instrumentEventCmd.Flags().String("pagination-key", "", "Pagination cursor")
 	instrumentEventCmd.MarkFlagRequired("series-symbol")
 }
 
 var instrumentEventCategoriesCmd = &cobra.Command{
 	Use: "event-categories", Short: "List event contract categories",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return doInstrumentGet("/openapi/instrument/event/categories", nil)
+		return doInstrumentGet("/trading/instruments/event-contracts/categories/list", nil)
 	},
 }
 
@@ -329,27 +328,25 @@ var instrumentEventSeriesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		category, _ := cmd.Flags().GetString("category")
 		symbols, _ := cmd.Flags().GetString("symbol")
-		lastID, _ := cmd.Flags().GetString("last-series-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		q := map[string]string{"page_size": fmt.Sprintf("%d", pageSize)}
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{}
 		if category != "" {
 			q["category"] = category
 		}
 		if symbols != "" {
 			q["symbols"] = symbols
 		}
-		if lastID != "" {
-			q["last_series_id"] = lastID
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
-		return doInstrumentGet("/openapi/instrument/event/series/list", q)
+		return doInstrumentGet("/trading/instruments/event-contracts/series/list", q)
 	},
 }
 
 func init() {
 	instrumentEventSeriesCmd.Flags().String("category", "", "Category: ECONOMICS,FINANCIALS,POLITICS,ENTERTAINMENT,etc.")
 	instrumentEventSeriesCmd.Flags().String("symbol", "", "Series symbol(s), comma-separated")
-	instrumentEventSeriesCmd.Flags().String("last-series-id", "", "Last series ID for pagination")
-	instrumentEventSeriesCmd.Flags().Int("page-size", 500, "Page size")
+	instrumentEventSeriesCmd.Flags().String("pagination-key", "", "Pagination cursor")
 }
 
 var instrumentEventEventsCmd = &cobra.Command{
@@ -365,7 +362,7 @@ var instrumentEventEventsCmd = &cobra.Command{
 		if status != "" {
 			q["status"] = status
 		}
-		return doInstrumentGet("/openapi/instrument/event/events", q)
+		return doInstrumentGet("/trading/instruments/event-contracts/events/list", q)
 	},
 }
 
@@ -383,7 +380,7 @@ var instrumentCompanyProfileCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/company/profile", map[string]string{"symbol": symbol, "category": category})
+		return doInstrumentGet("/market-data/fundamentals/company-profiles/get", map[string]string{"symbol": symbol, "category": category})
 	},
 }
 
@@ -400,7 +397,7 @@ var instrumentAnalystPriceCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/analyst/target-price", map[string]string{"symbol": symbol, "category": category})
+		return doInstrumentGet("/market-data/fundamentals/analysis/target-prices/get", map[string]string{"symbol": symbol, "category": category})
 	},
 }
 
@@ -417,7 +414,7 @@ var instrumentAnalystRatingCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/analyst/rating", map[string]string{"symbol": symbol, "category": category})
+		return doInstrumentGet("/market-data/fundamentals/analysis/ratings/get", map[string]string{"symbol": symbol, "category": category})
 	},
 }
 
