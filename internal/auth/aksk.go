@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/webull-inc/webull-openapi-cli/internal/config"
@@ -41,7 +42,7 @@ func NewAkSkProvider(profile *config.Profile, pm *config.ProfileManager, appKey,
 // Authenticate adds AK/SK signature headers to the request.
 func (p *AkSkProvider) Authenticate(req *http.Request, body []byte) error {
 	if p.appKey == "" {
-		return fmt.Errorf("AK/SK credentials not configured in profile %q", p.profile.Name)
+		return fmt.Errorf("AK/SK credentials not configured. Run 'webull auth login --method credentials'")
 	}
 
 	host := req.URL.Host
@@ -69,7 +70,7 @@ func (p *AkSkProvider) Authenticate(req *http.Request, body []byte) error {
 	}
 
 	// Add version header
-	req.Header.Set("x-version", "v2")
+	req.Header.Set("x-version", "v3")
 
 	// Add 2FA token if available and not expired
 	if p.profile.AkSk != nil && p.profile.AkSk.TokenCheckEnabled && p.token != "" {
@@ -116,21 +117,23 @@ func (p *AkSkProvider) HandleAuthError(resp *http.Response) (bool, error) {
 		// Persist non-sensitive fields to disk
 		if p.pm != nil {
 			cfg, err := p.pm.Load()
-			if err == nil {
-				if prof, ok := cfg.Profiles[p.profile.Name]; ok {
-					prof.AkSk.TokenExpires = tokenResp.Expires
-					prof.AkSk.TokenCheckEnabled = true
-					prof.AkSk.TokenStatus = tokenResp.Status
-					p.pm.Save(cfg)
+			if err == nil && cfg.Profile != nil && cfg.Profile.AkSk != nil {
+				cfg.Profile.AkSk.TokenExpires = tokenResp.Expires
+				cfg.Profile.AkSk.TokenCheckEnabled = true
+				cfg.Profile.AkSk.TokenStatus = tokenResp.Status
+				if err := p.pm.Save(cfg); err != nil {
+					fmt.Fprintf(os.Stderr, "warning: 2FA token acquired but failed to save session metadata: %v\n", err)
 				}
 			}
 		}
 
 		// Update token in system keychain
-		cred, err := config.LoadCredential(p.profile.Name)
+		cred, err := config.LoadCredential()
 		if err == nil {
 			cred.Token = tokenResp.Token
-			config.SaveCredential(p.profile.Name, cred)
+			if err := config.SaveCredential(cred); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: 2FA token acquired but failed to save it: %v\n", err)
+			}
 		}
 
 		return true, nil

@@ -9,51 +9,65 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+)
+
+// configVersion is the current profiles.json schema version.
+const configVersion = "2.0"
+
+// corruptConfigNoticeOnce limits the unreadable-config warning to once per process.
+var corruptConfigNoticeOnce sync.Once
+
+// AuthMethodOAuth / AuthMethodAkSk identify the two supported auth methods.
+const (
+	AuthMethodOAuth = "oauth"
+	AuthMethodAkSk  = "ak_sk"
 )
 
 // AkSkCredentials holds non-sensitive AK/SK metadata.
-// Sensitive data (app_key, app_secret, token) is stored in system keychain.
+// Sensitive data (app_key, app_secret, token) is stored in the system keychain.
 type AkSkCredentials struct {
 	TokenCheckEnabled bool   `json:"token_check_enabled"`
 	TokenExpires      int64  `json:"token_expires,omitempty"`
 	TokenStatus       string `json:"token_status,omitempty"`
 }
 
-// OAuthCredentials holds OAuth authentication data.
-// Reserved for Phase 2 - not used in current release.
+// OAuthCredentials holds non-sensitive OAuth metadata stored in profiles.json.
+// Sensitive data (access_token, refresh_token) is stored in the system keychain.
 type OAuthCredentials struct {
 	ClientID         string `json:"client_id"`
-	AccessToken      string `json:"access_token"`
-	RefreshToken     string `json:"refresh_token"`
-	Scope            string `json:"scope"`
-	ExpiresAt        string `json:"expires_at"`
-	RefreshExpiresAt string `json:"refresh_expires_at"`
+	Scope            string `json:"scope,omitempty"`
+	IdentityID       string `json:"identity_id,omitempty"`
+	ExpiresAt        int64  `json:"expires_at"`
+	RefreshExpiresAt int64  `json:"refresh_expires_at"`
 }
 
-// Endpoints holds custom endpoint overrides.
+// Endpoints holds optional endpoint overrides. Overrides only take effect in the
+// uat environment (see ResolveAPIEndpoint / ResolveOAuthEndpoints); prod is
+// always locked to the hardcoded values.
+//
+// AK/SK only uses API. OAuth uses API + H5 + Token.
 type Endpoints struct {
-	API    string `json:"api,omitempty"`
-	Quotes string `json:"quotes_api,omitempty"`
-	Events string `json:"events_api,omitempty"`
+	API   string `json:"api,omitempty"`
+	H5    string `json:"h5,omitempty"`
+	Token string `json:"token,omitempty"`
 }
 
-// Profile represents a single named configuration.
+// Profile represents the single authentication record. The CLI stores exactly
+// one profile: either OAuth or AK/SK. Each login overwrites the previous record.
 type Profile struct {
-	Name       string           `json:"name"`
-	AuthMethod string           `json:"auth_method"` // "ak_sk" (Phase 2 will add "oauth")
-	Region     Region           `json:"region"`
-	Env        Environment      `json:"env"`
-	Endpoints  Endpoints        `json:"endpoints"`
-	AkSk       *AkSkCredentials `json:"ak_sk,omitempty"`
-	// OAuth is reserved for Phase 2.
-	OAuth *OAuthCredentials `json:"oauth,omitempty"`
+	AuthMethod string            `json:"auth_method"` // "oauth" or "ak_sk"
+	Region     Region            `json:"region"`
+	Env        Environment       `json:"env"`
+	Endpoints  Endpoints         `json:"endpoints,omitempty"`
+	OAuth      *OAuthCredentials `json:"oauth,omitempty"`
+	AkSk       *AkSkCredentials  `json:"ak_sk,omitempty"`
 }
 
-// ConfigFile represents the full profiles.json structure.
+// ConfigFile represents the full profiles.json structure (single record, v2.0).
 type ConfigFile struct {
-	Version       string              `json:"version"`
-	ActiveProfile string              `json:"active_profile"`
-	Profiles      map[string]*Profile `json:"profiles"`
+	Version string   `json:"version"`
+	Profile *Profile `json:"profile,omitempty"`
 }
 
 // DefaultConfigPath returns the default path to profiles.json.
@@ -62,7 +76,7 @@ func DefaultConfigPath() string {
 	return filepath.Join(home, ".config", "webull", "profiles.json")
 }
 
-// ProfileManager handles CRUD operations on profiles.
+// ProfileManager handles reading and writing the single profile record.
 type ProfileManager struct {
 	configPath string
 }
@@ -76,24 +90,36 @@ func NewProfileManager(configPath string) *ProfileManager {
 }
 
 // Load reads and parses the config file.
+//
+// Any file that does not conform to the current v2.0 schema (missing file,
+// legacy multi-profile layout, or an empty profile) is treated as "not
+// authenticated": Load returns an empty ConfigFile and no error, and the caller
+// prompts the user to log in again. The CLI is an Alpha Preview and does not
+// migrate legacy layouts.
 func (pm *ProfileManager) Load() (*ConfigFile, error) {
+	empty := &ConfigFile{Version: configVersion}
+
 	data, err := os.ReadFile(pm.configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &ConfigFile{
-				Version:  "1.0",
-				Profiles: make(map[string]*Profile),
-			}, nil
+			return empty, nil
 		}
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	var cfg ConfigFile
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
+		// Unparseable / legacy layout → treat as not authenticated, but tell the
+		// user the file could not be read so a damaged or hand-edited file is not
+		// mistaken for "never logged in".
+		corruptConfigNoticeOnce.Do(func() {
+			fmt.Fprintf(os.Stderr, "warning: %s is not valid JSON (%v); ignoring it and treating this machine as not logged in\n",
+				pm.configPath, err)
+		})
+		return empty, nil
 	}
-	if cfg.Profiles == nil {
-		cfg.Profiles = make(map[string]*Profile)
+	if cfg.Version != configVersion || cfg.Profile == nil || cfg.Profile.AuthMethod == "" {
+		return empty, nil
 	}
 	return &cfg, nil
 }
@@ -110,22 +136,32 @@ func (pm *ProfileManager) Save(cfg *ConfigFile) error {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
-	// Write with flock for concurrency safety
+	// Write with flock for concurrency safety.
 	return writeFileWithLock(pm.configPath, data, 0600)
 }
 
-// GetActive returns the currently active profile.
+// GetActive returns the single authentication profile, or an error when the CLI
+// has not been authenticated yet.
 func (pm *ProfileManager) GetActive() (*Profile, error) {
 	cfg, err := pm.Load()
 	if err != nil {
 		return nil, err
 	}
-	if cfg.ActiveProfile == "" {
-		return nil, fmt.Errorf("no active profile. Run: webull auth login --region <region>")
+	if cfg.Profile == nil {
+		return nil, fmt.Errorf("not authenticated. Run: webull auth login")
 	}
-	p, ok := cfg.Profiles[cfg.ActiveProfile]
-	if !ok {
-		return nil, fmt.Errorf("active profile %q not found in config", cfg.ActiveProfile)
-	}
-	return p, nil
+	return cfg.Profile, nil
+}
+
+// SaveProfile persists a single profile, overwriting any existing record.
+func (pm *ProfileManager) SaveProfile(profile *Profile) error {
+	return pm.Save(&ConfigFile{
+		Version: configVersion,
+		Profile: profile,
+	})
+}
+
+// Clear removes the stored profile record, leaving an empty config file.
+func (pm *ProfileManager) Clear() error {
+	return pm.Save(&ConfigFile{Version: configVersion})
 }

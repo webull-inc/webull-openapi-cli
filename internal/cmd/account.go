@@ -36,8 +36,7 @@ func init() {
 
 	accountPositionDetailCmd.Flags().String("account-id", "", "Account ID (required)")
 	accountPositionDetailCmd.Flags().String("instrument-id", "", "Instrument ID (required)")
-	accountPositionDetailCmd.Flags().String("last-id", "", "Last position ID for pagination")
-	accountPositionDetailCmd.Flags().Int("page-size", 10, "Page size (max 100)")
+	accountPositionDetailCmd.Flags().String("pagination-key", "", "Pagination cursor")
 	accountPositionDetailCmd.MarkFlagRequired("account-id")
 	accountPositionDetailCmd.MarkFlagRequired("instrument-id")
 }
@@ -49,44 +48,36 @@ func newAPIClient() (*client.APIClient, error) {
 		return nil, err
 	}
 
-	var appKey, appSecret, token string
+	var provider auth.CredentialProvider
 
-	// Environment variable credentials override profile
-	if envKey, envSecret, ok := config.EnvCredentials(); ok {
-		appKey = envKey
-		appSecret = envSecret
-	} else {
-		// Load credentials from system keychain
-		cred, err := config.LoadCredential(profile.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load credentials: %w. Run 'webull auth login' to re-authenticate", err)
+	switch profile.AuthMethod {
+	case config.AuthMethodOAuth:
+		provider = auth.NewOAuthProvider(profile, pm)
+	default:
+		// AK/SK (credentials) auth
+		var appKey, appSecret, token string
+
+		// Environment variable credentials override the stored credential.
+		if envKey, envSecret, ok := config.EnvCredentials(); ok {
+			appKey = envKey
+			appSecret = envSecret
+		} else {
+			cred, err := config.LoadCredential()
+			if err != nil {
+				return nil, fmt.Errorf("failed to load credentials: %w. Run 'webull auth login' to re-authenticate", err)
+			}
+			appKey = cred.AppKey
+			appSecret = cred.AppSecret
+			token = cred.Token
 		}
-		appKey = cred.AppKey
-		appSecret = cred.AppSecret
-		token = cred.Token
+		provider = auth.NewAkSkProvider(profile, pm, appKey, appSecret, token)
 	}
 
-	// Resolve endpoints: env overrides > profile overrides > defaults
-	envOverrides := config.EnvEndpointOverrides()
-	var overrides *config.RegionEndpoints
-	if profile.Endpoints.API != "" {
-		overrides = &config.RegionEndpoints{
-			API: profile.Endpoints.API,
-		}
-	}
-	endpoints := config.GetEndpoints(profile.Region, overrides)
-	// Env overrides take highest priority
-	if envOverrides != nil {
-		if envOverrides.API != "" {
-			endpoints.API = envOverrides.API
-		}
-	}
-
-	// Create credential provider
-	provider := auth.NewAkSkProvider(profile, pm, appKey, appSecret, token)
+	// Resolve the Trading API host: file override honored on uat only, prod locked.
+	apiHost := config.ResolveAPIEndpoint(profile.Region, profile.Env, profile.Endpoints.API)
 
 	timeout := time.Duration(flagTimeout) * time.Second
-	apiClient := client.NewAPIClient(provider, endpoints, timeout)
+	apiClient := client.NewAPIClient(provider, apiHost, timeout, profile.AuthMethod)
 	apiClient.SetVerbose(flagVerbose)
 	apiClient.SetDebug(flagDebug)
 
@@ -103,7 +94,7 @@ var accountListCmd = &cobra.Command{
 			return err
 		}
 
-		resp, err := c.Do(context.Background(), "GET", "/openapi/account/list", nil)
+		resp, err := c.Do(context.Background(), "GET", "/trading/accounts/list", nil)
 		if err != nil {
 			output.PrintError("REQUEST_ERROR", err.Error(), 0)
 			return err
@@ -134,7 +125,7 @@ var accountBalanceCmd = &cobra.Command{
 			return err
 		}
 
-		resp, err := c.Do(context.Background(), "GET", "/openapi/assets/balance", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "GET", "/trading/assets/balances/get", &client.RequestOptions{
 			Query: map[string]string{"account_id": accountID},
 		})
 		if err != nil {
@@ -195,8 +186,7 @@ var accountPositionDetailCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		accountID, _ := cmd.Flags().GetString("account-id")
 		instrumentID, _ := cmd.Flags().GetString("instrument-id")
-		lastID, _ := cmd.Flags().GetString("last-id")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
+		cursor, _ := cmd.Flags().GetString("pagination-key")
 
 		c, err := newAPIClient()
 		if err != nil {
@@ -207,13 +197,12 @@ var accountPositionDetailCmd = &cobra.Command{
 		q := map[string]string{
 			"account_id":    accountID,
 			"instrument_id": instrumentID,
-			"page_size":     fmt.Sprintf("%d", pageSize),
 		}
-		if lastID != "" {
-			q["last_id"] = lastID
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
 
-		resp, err := c.Do(context.Background(), "GET", "/openapi/assets/position/details", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "GET", "/trading/assets/positions/get", &client.RequestOptions{
 			Query: q,
 		})
 		if err != nil {

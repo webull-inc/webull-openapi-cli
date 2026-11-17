@@ -50,7 +50,7 @@ var fundCompanyProfileCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/company/profile", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/company-profiles/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -67,7 +67,7 @@ var fundAnalystPriceCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/analyst/target-price", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/analysis/target-prices/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -84,7 +84,7 @@ var fundAnalystRatingCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/instrument/analyst/rating", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/analysis/ratings/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -103,7 +103,7 @@ var fundForecastEPSCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/stock/forecast-eps", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/forecast-eps/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -120,7 +120,7 @@ var fundFilingsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/stock/filings", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/filings/list", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -137,7 +137,7 @@ var fundEarningsCalendarCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/stock/earnings-calendar", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/earnings-calendars/list", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -154,7 +154,7 @@ var fundDividendCalendarCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/stock/dividend-calendar", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/dividend-calendars/list", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -176,7 +176,7 @@ var fundCapitalFlowCmd = &cobra.Command{
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/stock/capital-flow", q)
+		return doInstrumentGet("/market-data/fundamentals/capital-flows/get", q)
 	},
 }
 
@@ -197,7 +197,7 @@ var fundIndustryComparisonCmd = &cobra.Command{
 		if sortBy != "" {
 			q["sort_by"] = sortBy
 		}
-		return doInstrumentGet("/openapi/fundamentals/stock/industry-comparison", q)
+		return doInstrumentGet("/market-data/fundamentals/industry-comparisons/get", q)
 	},
 }
 
@@ -224,7 +224,7 @@ var fundIndicatorsCmd = &cobra.Command{
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/financial/indicators", q)
+		return doInstrumentGet("/market-data/fundamentals/indicators/get", q)
 	},
 }
 
@@ -250,7 +250,7 @@ var fundIncomeCmd = &cobra.Command{
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/financial/income", q)
+		return doInstrumentGet("/market-data/fundamentals/income-statements/get", q)
 	},
 }
 
@@ -276,7 +276,7 @@ var fundCashflowCmd = &cobra.Command{
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/financial/cash-flow", q)
+		return doInstrumentGet("/market-data/fundamentals/cash-flows/get", q)
 	},
 }
 
@@ -302,7 +302,7 @@ var fundBalancesheetCmd = &cobra.Command{
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/financial/balance-sheet", q)
+		return doInstrumentGet("/market-data/fundamentals/balance-sheets/get", q)
 	},
 }
 
@@ -319,7 +319,7 @@ var fundAlertCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/financial/alert", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/financial-alerts/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -338,7 +338,7 @@ var fundBriefCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/brief", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-brief/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -355,7 +355,7 @@ var fundPerformanceCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/performance", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-performances/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -373,11 +373,15 @@ var fundNetValueCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		count, _ := cmd.Flags().GetInt("count")
+		lastDate, _ := cmd.Flags().GetString("last-date")
 		q := map[string]string{"symbol": symbol, "category": category}
 		if count > 0 {
 			q["count"] = fmt.Sprintf("%d", count)
 		}
-		return doInstrumentGet("/openapi/fundamentals/fund/net-value", q)
+		if lastDate != "" {
+			q["last_date"] = lastDate
+		}
+		return doInstrumentGet("/market-data/fundamentals/fund-net-values/get", q)
 	},
 }
 
@@ -385,6 +389,7 @@ func init() {
 	fundNetValueCmd.Flags().String("symbol", "", "Symbol (required)")
 	fundNetValueCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
 	fundNetValueCmd.Flags().Int("count", 20, "Number of records")
+	fundNetValueCmd.Flags().String("last-date", "", "Last query date yyyy-MM-dd")
 	fundNetValueCmd.MarkFlagRequired("symbol")
 }
 
@@ -393,7 +398,7 @@ var fundHoldingsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/holdings", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-holdings/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -410,24 +415,19 @@ var fundDividendsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		pageIndex, _ := cmd.Flags().GetInt("page-index")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
+		cursor, _ := cmd.Flags().GetString("pagination-key")
 		q := map[string]string{"symbol": symbol, "category": category}
-		if pageIndex > 0 {
-			q["page_index"] = fmt.Sprintf("%d", pageIndex)
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
-		if pageSize > 0 {
-			q["page_size"] = fmt.Sprintf("%d", pageSize)
-		}
-		return doInstrumentGet("/openapi/fundamentals/fund/dividends", q)
+		return doInstrumentGet("/market-data/fundamentals/fund-dividends/get", q)
 	},
 }
 
 func init() {
 	fundDividendsCmd.Flags().String("symbol", "", "Symbol (required)")
 	fundDividendsCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
-	fundDividendsCmd.Flags().Int("page-index", 1, "Page index (default 1)")
-	fundDividendsCmd.Flags().Int("page-size", 10, "Number of entries per page (default 10, max 20)")
+	fundDividendsCmd.Flags().String("pagination-key", "", "Pagination cursor")
 	fundDividendsCmd.MarkFlagRequired("symbol")
 }
 
@@ -436,7 +436,7 @@ var fundRatingCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/rating", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-ratings/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -453,7 +453,7 @@ var fundSplitsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/splits", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-splits/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -470,7 +470,7 @@ var fundFilesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/files", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-files/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},
@@ -487,7 +487,7 @@ var fundAllocationCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doInstrumentGet("/openapi/fundamentals/fund/allocation", map[string]string{
+		return doInstrumentGet("/market-data/fundamentals/fund-allocations/get", map[string]string{
 			"symbol": symbol, "category": category,
 		})
 	},

@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	tokenCreatePath = "/openapi/auth/token/create"
-	tokenCheckPath  = "/openapi/auth/token/check"
+	tokenCreatePath = "/auth/tokens/create"
+	tokenCheckPath  = "/auth/tokens/check"
 	configPath      = "/openapi/config"
 
 	pollInterval = 5 * time.Second
@@ -255,13 +255,8 @@ func (tm *TokenManager) doRequest(ctx context.Context, method, path string, body
 	return client.Do(req)
 }
 
-// ResolveAPIHost returns the API host for a given profile.
-// It uses the profile's endpoint override if set, otherwise falls back to the
-// default production endpoint for the region.
+// ResolveAPIHost returns the Trading API host for a given profile, applying the
+// region/env resolution rules (file override honored on uat only, prod locked).
 func ResolveAPIHost(profile *config.Profile) string {
-	if profile.Endpoints.API != "" {
-		return profile.Endpoints.API
-	}
-	ep := config.GetEndpoints(profile.Region, nil)
-	return ep.API
+	return config.ResolveAPIEndpoint(profile.Region, profile.Env, profile.Endpoints.API)
 }

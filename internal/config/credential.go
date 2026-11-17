@@ -7,10 +7,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/zalando/go-keyring"
 )
 
+// keyringService is the keychain service for AK/SK credentials. The CLI stores a
+// single credential, so it shares the fixed keyringAccount used for OAuth.
 const keyringService = "webull-cli"
 
 // Credential holds sensitive authentication data stored in the system keychain.
@@ -21,22 +21,22 @@ type Credential struct {
 }
 
 // SaveCredential stores AK/SK and token in the system keychain.
-func SaveCredential(profileName string, cred *Credential) error {
+func SaveCredential(cred *Credential) error {
 	data, err := json.Marshal(cred)
 	if err != nil {
 		return fmt.Errorf("failed to serialize credential: %w", err)
 	}
-	if err := keyring.Set(keyringService, profileName, string(data)); err != nil {
-		return fmt.Errorf("failed to save credential to keychain: %w", err)
+	if err := secureSet(keyringService, keyringAccount, string(data)); err != nil {
+		return fmt.Errorf("failed to save credential: %w", err)
 	}
 	return nil
 }
 
-// LoadCredential retrieves AK/SK and token from the system keychain.
-func LoadCredential(profileName string) (*Credential, error) {
-	data, err := keyring.Get(keyringService, profileName)
+// LoadCredential retrieves AK/SK and token from secure storage.
+func LoadCredential() (*Credential, error) {
+	data, err := secureGet(keyringService, keyringAccount)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load credential from keychain: %w", err)
+		return nil, fmt.Errorf("failed to load credential: %w", err)
 	}
 	var cred Credential
 	if err := json.Unmarshal([]byte(data), &cred); err != nil {
@@ -45,11 +45,10 @@ func LoadCredential(profileName string) (*Credential, error) {
 	return &cred, nil
 }
 
-// DeleteCredential removes a credential from the system keychain.
-func DeleteCredential(profileName string) error {
-	err := keyring.Delete(keyringService, profileName)
-	if err != nil {
-		return fmt.Errorf("failed to delete credential from keychain: %w", err)
+// DeleteCredential removes the AK/SK credential from secure storage.
+func DeleteCredential() error {
+	if err := secureDelete(keyringService, keyringAccount); err != nil {
+		return fmt.Errorf("failed to delete credential: %w", err)
 	}
 	return nil
 }

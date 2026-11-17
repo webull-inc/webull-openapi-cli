@@ -9,7 +9,7 @@ CLI for [Webull](https://www.webull.com/) OpenAPI. Trade stocks, options, future
 - **Full asset coverage**: Stocks, options, futures, crypto, event contracts
 - **Multi-region**: US, HK, JP, SG, TH, MY, UK, BR, MX, ZA
 - **Agent-first design**: JSON output, `--quiet` mode, structured errors, explicit exit codes
-- **AK/SK authentication**: HMAC signature + optional 2FA token
+- **Two auth modes**: OAuth device authorization (default, browser-based) and AK/SK (HMAC signature + optional 2FA token)
 - **Safety**: Order confirmation prompts (skip with `-y`), `--dry-run` mode
 - **Scriptable**: Pipe-friendly, `--csv` export
 
@@ -49,8 +49,8 @@ $env:PATH += ";C:\path\to\webull"
 ## Quick Start
 
 ```bash
-# Authenticate
-webull auth login --region us
+# Authenticate (OAuth device authorization, opens a browser)
+webull auth login
 
 # Check your account
 webull account list
@@ -77,48 +77,122 @@ webull data fundamentals earnings-calendar --symbol 00700 --category HK_STOCK
 
 ## Authentication
 
-### AK/SK + 2FA (Phase 1)
+The CLI supports two authentication modes:
+
+| Mode | Command | Credentials |
+|------|---------|-------------|
+| **OAuth** (default) | `webull auth login` | Browser-based device authorization |
+| **AK/SK** | `webull auth login --method credentials --region <region>` | App Key / App Secret + optional 2FA |
+
+### OAuth (default)
 
 ```bash
-webull auth login --region us
+webull auth login
 ```
 
-Prompts for App Key and App Secret. If 2FA is enabled, you'll be asked to verify in the Webull App.
+Runs an OAuth 2.0 device authorization flow ([RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628)):
 
-Credentials (AK/SK and 2FA token) are stored securely in the system keychain:
-- **macOS**: Keychain Access (service: `webull-cli`)
+1. The CLI prints an authorization URL and a short user code, and tries to open your browser.
+2. Sign in and approve the request in the browser (choose the account and scope to authorize).
+3. The CLI polls in the background and completes automatically once you approve.
+
+```
+Open the following URL in your browser to authorize:
+https://.../oauth2/ai-cli/login?client_id=...&user_code=WDJB-MJHT
+
+Enter the code: WDJB-MJHT
+
+Browser opened. Waiting for authorization...
+
+Successfully authenticated.
+```
+
+Notes:
+- OAuth is **currently available for the US region only**. No `--region` flag is needed — the authorized region is determined during authorization.
+- Works on headless machines: if no browser is available, copy the printed URL to any device to authorize.
+- The access token is refreshed automatically using the refresh token; you generally only authorize once.
+- PKCE is used to protect the exchange; the CLI never stores the device code.
+
+### AK/SK + 2FA
+
+```bash
+webull auth login --method credentials --region us
+```
+
+Prompts for App Key and App Secret. If 2FA is enabled, you'll be asked to verify in the Webull App. AK/SK mode supports all regions and requires `--region`.
+
+### Credential Storage
+
+The CLI stores a **single** authentication record. Each successful `auth login`
+overwrites the previous one, whether it was OAuth or AK/SK — there is no
+multi-profile switching.
+
+Tokens and secrets are stored securely in the system keychain:
+- **macOS**: Keychain Access (service: `webull-cli`, OAuth: `webull-cli-oauth`)
 - **Windows**: Credential Manager
 - **Linux**: Secret Service (gnome-keyring / KDE Wallet)
 
-Non-sensitive profile data (region, env, endpoints) is stored in `~/.config/webull/profiles.json` (macOS/Linux) or `%USERPROFILE%\.config\webull\profiles.json` (Windows).
+**Encrypted-file fallback.** When the system keychain is unavailable (for
+example a headless Linux host without Secret Service, or a CI container), the
+CLI automatically falls back to an AES-256-GCM encrypted file at
+`~/.config/webull/credentials-<service>.enc` (`0600`) and prints a one-line
+notice to stderr. The encryption key is derived from three independent parts, so
+no single artifact can decrypt the file on its own:
+- a random key material file `~/.config/webull/key_material` (`0600`, created on first use)
+- an optional environment variable `WEBULL_KEY_SALT` (handy for CI)
+- a machine fingerprint (hostname + user)
 
-### UAT Environment
+This fallback protects against casual disclosure (accidental commits, backup
+leaks, other local users). It is not a substitute for the OS keychain and does
+not defend against an attacker with full read access to your home directory and
+process environment. The keychain is always preferred when available.
 
-For non-production environments, you must provide endpoint hosts explicitly:
+Non-sensitive data (auth method, region, env, token expiry) is stored in
+`~/.config/webull/profiles.json` (macOS/Linux) or
+`%USERPROFILE%\.config\webull\profiles.json` (Windows) with `0600` permissions.
+
+### Logout
 
 ```bash
-webull auth login --region hk --env uat \
-  --api-endpoint api.sandbox.webull.hk \
-  --name hk-sandbox
+webull auth logout
 ```
 
-`--api-endpoint` is required for UAT.
+Removes the stored credentials from the system keychain and clears the local
+config record.
 
-### Environment Variables
+### Environment Selection
 
-For CI/automation, use environment variables instead of interactive login:
+Use `--env` to choose the environment:
 
 ```bash
+webull auth login --env prod            # production (default)
+webull auth login --env sandbox         # sandbox
+```
+
+`sandbox` and `uat` are accepted as equivalent aliases for the non-production
+environment. Endpoint hosts for every region and environment are built into the
+CLI — you do not need to specify them.
+
+### Environment Variables (AK/SK)
+
+For CI/automation, `WEBULL_APP_KEY` / `WEBULL_APP_SECRET` override the stored
+App Key / App Secret at request time. You still need to run `auth login` once
+with `--method credentials` so the CLI knows the region and environment:
+
+```bash
+webull auth login --method credentials --region us   # establishes region/env
+
 export WEBULL_APP_KEY=your-app-key
 export WEBULL_APP_SECRET=your-app-secret
-webull account list
+webull account list                                   # uses env-var credentials
 ```
 
 ### Credential Precedence
 
+For AK/SK requests, the App Key / App Secret are resolved in this order:
+
 1. Environment variables (`WEBULL_APP_KEY` + `WEBULL_APP_SECRET`)
-2. `--profile` flag
-3. Active profile from config file
+2. Stored credentials from the system keychain
 
 ## Commands
 
@@ -134,7 +208,7 @@ Orders are organized by asset class under `webull order <asset>`:
 | `webull order stock combo` | Place a combo order (OTO/OCO/OTOCO) via JSON |
 | `webull order option submit` | Place a single-leg option order |
 | `webull order option preview` | Preview option order fees |
-| `webull order option replace` | Modify an option order (multi-leg JSON: US only) |
+| `webull order option replace` | Modify an option order |
 | `webull order option strategy` | Place an option order via JSON (multi-leg strategies: US only) |
 | `webull order futures submit` | Place a futures order |
 | `webull order futures replace` | Modify a futures order |
@@ -154,8 +228,7 @@ Data is organized by asset class under `webull data <asset>`:
 | Command | Description |
 |---------|-------------|
 | `webull data stock snapshot` | Real-time stock snapshot |
-| `webull data stock bars` | Historical candlestick bars |
-| `webull data stock batch-bars` | Batch historical bars (multiple symbols) |
+| `webull data stock batch-bars` | Historical candlestick bars (one or more symbols) |
 | `webull data stock quotes` | Depth quotes (bid/ask) |
 | `webull data stock tick` | Tick-by-tick trades |
 | `webull data stock footprint` | Large order footprint |
@@ -266,16 +339,13 @@ Data is organized by asset class under `webull data <asset>`:
 | `webull account positions` | Account positions |
 | `webull account position-detail` | Position details by contract (JP) |
 
-### Profile Management
+### Authentication
 
 | Command | Description |
 |---------|-------------|
-| `webull auth login` | Authenticate (AK/SK + 2FA) |
+| `webull auth login` | Authenticate (OAuth by default, or AK/SK with `--method credentials`) |
+| `webull auth logout` | Clear local credentials |
 | `webull auth status` | Check auth status |
-| `webull profile list` | List profiles |
-| `webull profile switch` | Switch active profile |
-| `webull profile logout` | Remove a profile |
-| `webull profile set-endpoint` | Override API endpoint |
 
 ### Utilities
 
@@ -288,7 +358,7 @@ Every command supports `--help` for full flag documentation:
 
 ```bash
 webull order stock submit --help    # See all flags for stock submit
-webull data stock bars --help       # See all flags for bars query
+webull data stock batch-bars --help # See all flags for bars query
 ```
 
 ### JSON Input Mode
@@ -314,25 +384,58 @@ webull account positions --account-id ACC123 --csv     # CSV
 webull data stock snapshot --symbol AAPL,TSLA          # Multiple symbols
 ```
 
+## Migration Notes (v1.0.8)
+
+This release moves the commands to the latest API paths and replaces the old paging flags with `--pagination-key`, without a compatibility layer. Scripts that still pass a removed flag fail with `unknown flag`.
+
+### Paging
+
+Use `--pagination-key` with the `next pagination_key` value from the previous response. The last page has no key.
+
+| Command | Removed flags |
+|---------|---------------|
+| `webull account position-detail` | `--last-id`, `--page-size` |
+| `webull data fundamentals fund-dividends` | `--page-index`, `--page-size` |
+| `webull data screener market-sectors`, `market-sectors-detail` | `--page-index`, `--page-size` |
+| `webull instrument stock`, `instrument crypto`, `instrument event` | `--last-instrument-id`, `--page-size` |
+| `webull instrument event-series` | `--last-series-id`, `--page-size` |
+| `webull order executions` | `--last-execution-id`, `--page-size` |
+
+`webull data screener gainers-losers`, `actives`, `high-dividend` and `52whl` lost `--page-index` and `--page-size` and have no replacement: these endpoints return a single result set without paging.
+
+The number of rows per page is now decided by the server default, not by `--page-size`.
+
+### Other changes
+
+| Before | Now |
+|--------|-----|
+| `webull data stock bars` | Removed. Use `webull data stock batch-bars --symbol AAPL` (comma-separated symbols are accepted). |
+| `webull instrument option --start-date` / `--end-date` | `--start-date` is now the exact expiration date and `--end-date` is the expiration date lower bound (inclusive). Check any script that used them as a range. |
+| `webull profile list / switch / logout / set-endpoint` | Removed. The CLI keeps a single authentication record; each `auth login` overwrites it. Use `webull auth logout` to remove it. |
+| Global `--profile`, `--env`, `--region` | Removed from other commands. `webull auth login` keeps `--env` and `--region`. |
+| `webull auth login --name`, `--api-endpoint`, `--profile` | Removed. Endpoints for every region are built in. Use `--method oauth` (default) or `--method credentials`. |
+
+New options (no action needed): `--start-time` / `--end-time` (milliseconds) on the `data option|futures|crypto|event bars` and `data stock batch-bars` commands, `--sub-category` on `instrument stock`, `--body` / `--file` on the `order stock|futures|event replace` commands, and `order futures preview` / `order event preview`.
+
 ## Safety
 
 - **Order confirmation**: `order stock submit`, `order cancel`, and `order stock replace` prompt for confirmation in interactive mode. Use `-y` to skip.
 - **Dry run**: `webull order stock submit --dry-run` prints the request payload without submitting.
-- **Credentials**: AK/SK and tokens stored in system keychain (not in plaintext files). Non-sensitive config uses `0600` file permissions.
+- **Credentials**: OAuth tokens and AK/SK secrets are stored in the system keychain, or in an AES-256-GCM encrypted file when the keychain is unavailable — never in plaintext. Non-sensitive config uses `0600` file permissions.
 
 ## Global Flags
 
 | Flag | Description |
 |------|-------------|
-| `--profile` | Use a specific profile |
-| `--region` | Override profile region |
-| `--env` | Environment (prod/uat) |
 | `--csv` | Output in CSV format |
 | `--quiet` | Suppress non-data output |
 | `--verbose` | Show request summaries on stderr |
 | `--debug` | Show full request/response on stderr |
 | `--timeout` | HTTP timeout in seconds (default: 30) |
 | `-y, --yes` | Skip confirmation prompts |
+
+`auth login` takes its own `--method`, `--region`, and `--env` flags; see
+[Authentication](#authentication) above.
 
 ## Exit Codes
 

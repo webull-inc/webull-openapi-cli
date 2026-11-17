@@ -71,7 +71,7 @@ var watchlistListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := c.Do(context.Background(), "GET", "/openapi/market-data/watchlist/list", nil)
+		resp, err := c.Do(context.Background(), "GET", "/market-data/watchlists/list", nil)
 		if err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ var watchlistGetCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := c.Do(context.Background(), "GET", "/openapi/market-data/watchlist/instruments/list", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "GET", "/market-data/watchlists/instruments/list", &client.RequestOptions{
 			Query: map[string]string{"watchlist_id": id},
 		})
 		if err != nil {
@@ -128,7 +128,7 @@ var watchlistCreateCmd = &cobra.Command{
 		if sort > 0 {
 			body["sort"] = sort
 		}
-		resp, err := c.Do(context.Background(), "POST", "/openapi/market-data/watchlist/create", &client.RequestOptions{Body: body})
+		resp, err := c.Do(context.Background(), "POST", "/market-data/watchlists/create", &client.RequestOptions{Body: body})
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ var watchlistUpdateCmd = &cobra.Command{
 		if sort > 0 {
 			body["sort"] = sort
 		}
-		resp, err := c.Do(context.Background(), "POST", "/openapi/market-data/watchlist/update", &client.RequestOptions{Body: body})
+		resp, err := c.Do(context.Background(), "POST", "/market-data/watchlists/update", &client.RequestOptions{Body: body})
 		if err != nil {
 			return err
 		}
@@ -189,7 +189,7 @@ var watchlistDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		resp, err := c.Do(context.Background(), "POST", "/openapi/market-data/watchlist/delete", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "POST", "/market-data/watchlists/delete", &client.RequestOptions{
 			Body: map[string]interface{}{"watchlist_id": id},
 		})
 		if err != nil {
@@ -213,7 +213,7 @@ Example:
   webull watchlist add --id 12345 --body '{"instruments":[{"symbol":"AAPL","category":"US_STOCK","sort":1},{"symbol":"00700","category":"HK_STOCK","sort":2}]}'
   webull watchlist add --id 12345 --file instruments.json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return doWatchlistInstruments(cmd, "/openapi/market-data/watchlist/instruments/add")
+		return doWatchlistInstruments(cmd, "/market-data/watchlists/instruments/add")
 	},
 }
 
@@ -232,7 +232,7 @@ JSON mode:
 		bodyStr, _ := cmd.Flags().GetString("body")
 		fileStr, _ := cmd.Flags().GetString("file")
 		if bodyStr != "" || fileStr != "" {
-			return doWatchlistInstruments(cmd, "/openapi/market-data/watchlist/instruments/remove")
+			return doWatchlistInstruments(cmd, "/market-data/watchlists/instruments/remove")
 		}
 
 		// Flag mode
@@ -250,7 +250,7 @@ JSON mode:
 		if err != nil {
 			return err
 		}
-		resp, err := c.Do(context.Background(), "POST", "/openapi/market-data/watchlist/instruments/remove", &client.RequestOptions{
+		resp, err := c.Do(context.Background(), "POST", "/market-data/watchlists/instruments/remove", &client.RequestOptions{
 			Body: map[string]interface{}{"watchlist_id": id, "instruments": instruments},
 		})
 		if err != nil {
@@ -273,7 +273,7 @@ var watchlistSortCmd = &cobra.Command{
 Example:
   webull watchlist sort --id 12345 --body '{"instruments":[{"symbol":"AAPL","category":"US_STOCK","sort":1},{"symbol":"00700","category":"HK_STOCK","sort":2}]}'`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return doWatchlistInstruments(cmd, "/openapi/market-data/watchlist/instruments/update")
+		return doWatchlistInstruments(cmd, "/market-data/watchlists/instruments/update")
 	},
 }
 

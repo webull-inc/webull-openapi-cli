@@ -15,9 +15,6 @@ import (
 )
 
 var (
-	flagProfile string
-	flagRegion  string
-	flagEnv     string
 	flagCSV     bool
 	flagQuiet   bool
 	flagVerbose bool
@@ -39,9 +36,6 @@ Designed for developers, quantitative teams, and AI agents.`,
 
 func init() {
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&flagProfile, "profile", "", "Use a specific profile")
-	rootCmd.PersistentFlags().StringVar(&flagRegion, "region", "", "Override profile region")
-	rootCmd.PersistentFlags().StringVar(&flagEnv, "env", "", "Environment (prod/uat)")
 	rootCmd.PersistentFlags().BoolVar(&flagCSV, "csv", false, "Output in CSV format")
 	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "Suppress non-data output")
 	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Show request summaries on stderr")
@@ -51,7 +45,6 @@ func init() {
 
 	// Register sub-commands
 	rootCmd.AddCommand(authCmd)
-	rootCmd.AddCommand(profileCmd)
 	rootCmd.AddCommand(accountCmd)
 	rootCmd.AddCommand(orderCmd)
 	rootCmd.AddCommand(dataCmd)
@@ -102,47 +95,16 @@ var doctorCmd = &cobra.Command{
 			result["config_file"] = map[string]interface{}{"status": "ok", "path": config.DefaultConfigPath()}
 		}
 
-		// Check active profile
-		if cfg != nil && cfg.ActiveProfile != "" {
-			if profile, ok := cfg.Profiles[cfg.ActiveProfile]; ok {
-				result["active_profile"] = map[string]interface{}{
-					"status":      "ok",
-					"name":        profile.Name,
-					"region":      profile.Region,
-					"auth_method": profile.AuthMethod,
-				}
+		// Check the stored profile
+		if cfg != nil && cfg.Profile != nil {
+			profile := cfg.Profile
+			result["auth"] = buildDoctorAuth(profile)
 
-				// Check network connectivity
-				endpoints := config.GetEndpoints(profile.Region, nil)
-				if profile.Endpoints.API != "" {
-					endpoints.API = profile.Endpoints.API
-				}
-
-				netResult := map[string]interface{}{}
-				netResult["api_host"] = endpoints.API
-
-				result["network"] = netResult
-
-				// Check auth
-				if profile.AkSk != nil {
-					authResult := map[string]interface{}{
-						"token_check_enabled": profile.AkSk.TokenCheckEnabled,
-					}
-					// Load credential from keychain for display
-					if cred, err := config.LoadCredential(profile.Name); err == nil {
-						authResult["app_key"] = output.Mask(cred.AppKey)
-						if cred.Token != "" {
-							authResult["token"] = output.Mask(cred.Token)
-							authResult["token_status"] = profile.AkSk.TokenStatus
-						}
-					}
-					result["auth"] = authResult
-				}
-			} else {
-				result["active_profile"] = map[string]interface{}{"status": "error", "message": "profile not found"}
-			}
+			// Resolved API host
+			apiHost := config.ResolveAPIEndpoint(profile.Region, profile.Env, profile.Endpoints.API)
+			result["network"] = map[string]interface{}{"api_host": apiHost}
 		} else {
-			result["active_profile"] = map[string]interface{}{"status": "none", "message": "no active profile"}
+			result["auth"] = map[string]interface{}{"status": "none", "message": "not authenticated"}
 		}
 
 		// Check env vars
@@ -151,13 +113,32 @@ var doctorCmd = &cobra.Command{
 			envVars["WEBULL_APP_KEY"] = "set"
 			envVars["WEBULL_APP_SECRET"] = "set"
 		}
-		if config.EnvEndpointOverrides() != nil {
-			envVars["endpoint_overrides"] = "set"
-		}
 		if len(envVars) > 0 {
 			result["environment"] = envVars
 		}
 
 		return output.PrintJSON(result)
 	},
+}
+
+// buildDoctorAuth summarizes the stored profile for the doctor command.
+func buildDoctorAuth(profile *config.Profile) map[string]interface{} {
+	auth := map[string]interface{}{
+		"status":      "ok",
+		"auth_method": profile.AuthMethod,
+		"region":      profile.Region,
+		"env":         profile.Env,
+	}
+
+	if profile.AuthMethod == config.AuthMethodAkSk && profile.AkSk != nil {
+		auth["token_check_enabled"] = profile.AkSk.TokenCheckEnabled
+		if cred, err := config.LoadCredential(); err == nil {
+			auth["app_key"] = output.Mask(cred.AppKey)
+			if cred.Token != "" {
+				auth["token"] = output.Mask(cred.Token)
+				auth["token_status"] = profile.AkSk.TokenStatus
+			}
+		}
+	}
+	return auth
 }

@@ -9,10 +9,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/webull-inc/webull-openapi-cli/internal/auth"
 	"github.com/webull-inc/webull-openapi-cli/internal/client"
 	"github.com/webull-inc/webull-openapi-cli/internal/config"
 	"github.com/webull-inc/webull-openapi-cli/internal/output"
@@ -41,7 +39,6 @@ func init() {
 	dataCmd.AddCommand(dataScreenerCmd)
 
 	dataStockCmd.AddCommand(dataStockSnapshotCmd)
-	dataStockCmd.AddCommand(dataStockBarsCmd)
 	dataStockCmd.AddCommand(dataStockBatchBarsCmd)
 	dataStockCmd.AddCommand(dataStockQuotesCmd)
 	dataStockCmd.AddCommand(dataStockTickCmd)
@@ -98,7 +95,7 @@ var dataStockSnapshotCmd = &cobra.Command{
 		} else {
 			q["overnight_required"] = "false"
 		}
-		return doDataGet("/openapi/market-data/stock/snapshot", q)
+		return doDataGet("/market-data/stocks/snapshots/list", q)
 	},
 }
 
@@ -110,41 +107,6 @@ func init() {
 	dataStockSnapshotCmd.MarkFlagRequired("symbol")
 }
 
-var dataStockBarsCmd = &cobra.Command{
-	Use: "bars", Short: "Historical candlestick bars",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		symbol, _ := cmd.Flags().GetString("symbol")
-		category, _ := cmd.Flags().GetString("category")
-		timespan, _ := cmd.Flags().GetString("timespan")
-		count, _ := cmd.Flags().GetInt("count")
-		realTime, _ := cmd.Flags().GetBool("real-time")
-		sessions, _ := cmd.Flags().GetString("trading-sessions")
-		q := map[string]string{
-			"symbol": symbol, "category": category,
-			"timespan": timespan, "count": fmt.Sprintf("%d", count),
-		}
-		if realTime {
-			q["real_time_required"] = "true"
-		} else {
-			q["real_time_required"] = "false"
-		}
-		if sessions != "" {
-			q["trading_sessions"] = sessions
-		}
-		return doDataGet("/openapi/market-data/stock/bars", q)
-	},
-}
-
-func init() {
-	dataStockBarsCmd.Flags().String("symbol", "", "Symbol (required)")
-	dataStockBarsCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK, US_ETF, HK_STOCK, CN_STOCK")
-	dataStockBarsCmd.Flags().String("timespan", "D", "Timespan: M1,M5,M15,M30,M60,M120,M240,D,W,M,Y")
-	dataStockBarsCmd.Flags().Int("count", 200, "Number of bars (max 1200)")
-	dataStockBarsCmd.Flags().Bool("real-time", true, "Include latest unfinalized data")
-	dataStockBarsCmd.Flags().String("trading-sessions", "", "Trading sessions: PRE,RTH,ATH,OVN")
-	dataStockBarsCmd.MarkFlagRequired("symbol")
-}
-
 var dataStockBatchBarsCmd = &cobra.Command{
 	Use: "batch-bars", Short: "Historical bars for multiple symbols (batch)",
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -154,6 +116,8 @@ var dataStockBatchBarsCmd = &cobra.Command{
 		count, _ := cmd.Flags().GetInt("count")
 		realTime, _ := cmd.Flags().GetBool("real-time")
 		sessions, _ := cmd.Flags().GetString("trading-sessions")
+		startTime, _ := cmd.Flags().GetInt64("start-time")
+		endTime, _ := cmd.Flags().GetInt64("end-time")
 
 		// Convert comma-separated symbols to array
 		symbolList := strings.Split(symbols, ",")
@@ -175,12 +139,18 @@ var dataStockBatchBarsCmd = &cobra.Command{
 		if sessions != "" {
 			body["trading_sessions"] = sessions
 		}
+		if startTime > 0 {
+			body["start_time"] = startTime
+		}
+		if endTime > 0 {
+			body["end_time"] = endTime
+		}
 
 		cl, err := newAPIClient()
 		if err != nil {
 			return err
 		}
-		resp, err := cl.Do(context.Background(), "POST", "/openapi/market-data/stock/batch-bars", &client.RequestOptions{
+		resp, err := cl.Do(context.Background(), "POST", "/market-data/stocks/bars/list", &client.RequestOptions{
 			Body: body,
 		})
 		if err != nil {
@@ -206,6 +176,8 @@ func init() {
 	dataStockBatchBarsCmd.Flags().Int("count", 200, "Number of bars (max 1200)")
 	dataStockBatchBarsCmd.Flags().Bool("real-time", true, "Include latest unfinalized data")
 	dataStockBatchBarsCmd.Flags().String("trading-sessions", "", "Trading sessions: PRE,RTH,ATH,OVN")
+	dataStockBatchBarsCmd.Flags().Int64("start-time", 0, "Start time as timestamp in milliseconds")
+	dataStockBatchBarsCmd.Flags().Int64("end-time", 0, "End time as timestamp in milliseconds")
 	dataStockBatchBarsCmd.MarkFlagRequired("symbol")
 }
 
@@ -222,7 +194,7 @@ var dataStockQuotesCmd = &cobra.Command{
 		} else {
 			q["overnight_required"] = "false"
 		}
-		return doDataGet("/openapi/market-data/stock/quotes", q)
+		return doDataGet("/market-data/stocks/depths/list", q)
 	},
 }
 
@@ -245,7 +217,7 @@ var dataStockTickCmd = &cobra.Command{
 			"symbol": symbol, "category": category,
 			"count": fmt.Sprintf("%d", count), "trading_sessions": sessions,
 		}
-		return doDataGet("/openapi/market-data/stock/tick", q)
+		return doDataGet("/market-data/stocks/ticks/list", q)
 	},
 }
 
@@ -278,7 +250,7 @@ var dataStockFootprintCmd = &cobra.Command{
 		if sessions != "" {
 			q["trading_sessions"] = sessions
 		}
-		return doDataGet("/openapi/market-data/stock/footprint", q)
+		return doDataGet("/market-data/stocks/footprints/list", q)
 	},
 }
 
@@ -298,7 +270,7 @@ var dataStockNoiiBarsCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		actionType, _ := cmd.Flags().GetString("action-type")
-		return doDataGet("/openapi/market-data/stock/noii/bars", map[string]string{
+		return doDataGet("/market-data/stocks/noii-bars/list", map[string]string{
 			"symbol": symbol, "category": category, "imbalance_action_type": actionType,
 		})
 	},
@@ -317,7 +289,7 @@ var dataStockNoiiSnapshotCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		actionType, _ := cmd.Flags().GetString("action-type")
-		return doDataGet("/openapi/market-data/stock/noii/snapshot", map[string]string{
+		return doDataGet("/market-data/stocks/noii-snapshots/list", map[string]string{
 			"symbol": symbol, "category": category, "imbalance_action_type": actionType,
 		})
 	},
@@ -407,11 +379,15 @@ var data13FTransactionsCmd = &cobra.Command{
 		}
 		position, _ := cmd.Flags().GetString("position")
 		position = strings.ToUpper(strings.TrimSpace(position))
+		count, _ := cmd.Flags().GetInt("count")
 		cursor, _ := cmd.Flags().GetString("pagination-key")
 		if position != "OPEN" && position != "CLOSE" && position != "CHANGE" {
 			return fmt.Errorf("position must be one of OPEN, CLOSE, CHANGE")
 		}
 		q := map[string]string{"cik": cik, "position": position}
+		if count > 0 {
+			q["count"] = fmt.Sprintf("%d", count)
+		}
 		if cursor != "" {
 			q["pagination_key"] = cursor
 		}
@@ -467,12 +443,20 @@ var dataEconomicCalendarCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		startDate, _ := cmd.Flags().GetString("start-date")
 		endDate, _ := cmd.Flags().GetString("end-date")
-		q := map[string]string{"region": "US"}
+		region, _ := cmd.Flags().GetString("region")
+		cursor, _ := cmd.Flags().GetString("pagination-key")
+		q := map[string]string{}
+		if region != "" {
+			q["region"] = region
+		}
 		if startDate != "" {
 			q["start_date"] = startDate
 		}
 		if endDate != "" {
 			q["end_date"] = endDate
+		}
+		if cursor != "" {
+			q["pagination_key"] = cursor
 		}
 		return doUSDataGet("/market-data/fundamentals/economic-calendars/list", q)
 	},
@@ -565,6 +549,7 @@ func init() {
 	data13FHoldingsCmd.MarkFlagRequired("cik")
 	data13FTransactionsCmd.Flags().String("cik", "", "Institution CIK (required)")
 	data13FTransactionsCmd.Flags().String("position", "", "Position: OPEN, CLOSE, CHANGE (required)")
+	data13FTransactionsCmd.Flags().Int("count", 0, "Page size (default 10, max 50)")
 	data13FTransactionsCmd.Flags().String("pagination-key", "", "Pagination cursor")
 	data13FTransactionsCmd.MarkFlagRequired("cik")
 	data13FTransactionsCmd.MarkFlagRequired("position")
@@ -577,6 +562,8 @@ func init() {
 	dataStockInsiderHoldingsOverviewCmd.MarkFlagRequired("symbol")
 	dataEconomicCalendarCmd.Flags().String("start-date", "", "Start date yyyy-MM-dd")
 	dataEconomicCalendarCmd.Flags().String("end-date", "", "End date yyyy-MM-dd")
+	dataEconomicCalendarCmd.Flags().String("region", "", "Region: US, CN, EU, JP, GB (default US)")
+	dataEconomicCalendarCmd.Flags().String("pagination-key", "", "Pagination cursor")
 	dataNewsSearchCmd.Flags().String("keyword", "", "Search keyword, max 100 chars (required)")
 	dataNewsSearchCmd.Flags().String("start-date", "", "Start date yyyy-MM-dd")
 	dataNewsSearchCmd.Flags().String("end-date", "", "End date yyyy-MM-dd")
@@ -599,14 +586,11 @@ var dataScreenerMoversCmd = &cobra.Command{
 		category, _ := cmd.Flags().GetString("category")
 		sortBy, _ := cmd.Flags().GetString("sort-by")
 		direction, _ := cmd.Flags().GetString("direction")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		pageIndex, _ := cmd.Flags().GetInt("page-index")
 		q := map[string]string{
 			"rank_type": rankType, "category": category, "sort_by": sortBy,
-			"direction": direction, "page_size": fmt.Sprintf("%d", pageSize),
-			"page_index": fmt.Sprintf("%d", pageIndex),
+			"direction": direction,
 		}
-		return doDataGet("/openapi/market-data/screener/gainers-losers", q)
+		return doDataGet("/market-data/screeners/gainers-losers/list", q)
 	},
 }
 
@@ -615,8 +599,6 @@ func init() {
 	dataScreenerMoversCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
 	dataScreenerMoversCmd.Flags().String("sort-by", "CHANGE_RATIO", "Sort by: CHANGE_RATIO,VOLUME,MARKET_VALUE,etc.")
 	dataScreenerMoversCmd.Flags().String("direction", "DESC", "Direction: DESC (Gainers), ASC (Losers)")
-	dataScreenerMoversCmd.Flags().Int("page-size", 20, "Page size")
-	dataScreenerMoversCmd.Flags().Int("page-index", 1, "Page number")
 }
 
 var dataScreenerActivesCmd = &cobra.Command{
@@ -626,14 +608,11 @@ var dataScreenerActivesCmd = &cobra.Command{
 		category, _ := cmd.Flags().GetString("category")
 		sortBy, _ := cmd.Flags().GetString("sort-by")
 		direction, _ := cmd.Flags().GetString("direction")
-		pageSize, _ := cmd.Flags().GetInt("page-size")
-		pageIndex, _ := cmd.Flags().GetInt("page-index")
 		q := map[string]string{
 			"rank_type": rankType, "category": category, "sort_by": sortBy,
-			"direction": direction, "page_size": fmt.Sprintf("%d", pageSize),
-			"page_index": fmt.Sprintf("%d", pageIndex),
+			"direction": direction,
 		}
-		return doDataGet("/openapi/market-data/screener/top-active", q)
+		return doDataGet("/market-data/screeners/top-actives/list", q)
 	},
 }
 
@@ -642,8 +621,6 @@ func init() {
 	dataScreenerActivesCmd.Flags().String("category", "US_STOCK", "Category: US_STOCK")
 	dataScreenerActivesCmd.Flags().String("sort-by", "VOLUME", "Sort by: VOLUME,CHANGE_RATIO,MARKET_VALUE,etc.")
 	dataScreenerActivesCmd.Flags().String("direction", "DESC", "Direction: ASC, DESC")
-	dataScreenerActivesCmd.Flags().Int("page-size", 20, "Page size")
-	dataScreenerActivesCmd.Flags().Int("page-index", 1, "Page number")
 }
 
 // ==================== Option Data ====================
@@ -697,10 +674,18 @@ var dataOptionBarsCmd = &cobra.Command{
 			return fmt.Errorf("count must be between 1 and 1200")
 		}
 		realTime, _ := cmd.Flags().GetBool("real-time")
+		startTime, _ := cmd.Flags().GetString("start-time")
+		endTime, _ := cmd.Flags().GetString("end-time")
 		q := map[string]string{
 			"symbols": symbol, "category": category,
 			"timespan": timespan, "count": fmt.Sprintf("%d", count),
 			"real_time_required": fmt.Sprintf("%t", realTime),
+		}
+		if startTime != "" {
+			q["start_time"] = startTime
+		}
+		if endTime != "" {
+			q["end_time"] = endTime
 		}
 		return doDataGet("/market-data/options/bars/list", q)
 	},
@@ -712,6 +697,8 @@ func init() {
 	dataOptionBarsCmd.Flags().String("timespan", "D", "Timespan: M1, M5, M15, M30, M60, M120, M240, D, W, M, Y")
 	dataOptionBarsCmd.Flags().Int("count", 200, "Number of bars (1-1200)")
 	dataOptionBarsCmd.Flags().Bool("real-time", false, "Include the latest in-progress bar")
+	dataOptionBarsCmd.Flags().String("start-time", "", "Start time as timestamp in milliseconds")
+	dataOptionBarsCmd.Flags().String("end-time", "", "End time as timestamp in milliseconds")
 	dataOptionBarsCmd.MarkFlagRequired("symbol")
 }
 
@@ -753,7 +740,7 @@ var dataFuturesSnapshotCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doDataGet("/openapi/market-data/futures/snapshot", map[string]string{
+		return doDataGet("/market-data/futures/snapshots/list", map[string]string{
 			"symbols": symbol, "category": category,
 		})
 	},
@@ -772,9 +759,18 @@ var dataFuturesBarsCmd = &cobra.Command{
 		category, _ := cmd.Flags().GetString("category")
 		timespan, _ := cmd.Flags().GetString("timespan")
 		count, _ := cmd.Flags().GetInt("count")
-		return doDataGet("/openapi/market-data/futures/bars", map[string]string{
+		startTime, _ := cmd.Flags().GetString("start-time")
+		endTime, _ := cmd.Flags().GetString("end-time")
+		q := map[string]string{
 			"symbols": symbol, "category": category, "timespan": timespan, "count": fmt.Sprintf("%d", count),
-		})
+		}
+		if startTime != "" {
+			q["start_time"] = startTime
+		}
+		if endTime != "" {
+			q["end_time"] = endTime
+		}
+		return doDataGet("/market-data/futures/bars/list", q)
 	},
 }
 
@@ -783,6 +779,8 @@ func init() {
 	dataFuturesBarsCmd.Flags().String("category", "US_FUTURES", "Category: US_FUTURES")
 	dataFuturesBarsCmd.Flags().String("timespan", "D", "Timespan")
 	dataFuturesBarsCmd.Flags().Int("count", 30, "Number of bars")
+	dataFuturesBarsCmd.Flags().String("start-time", "", "Start time as timestamp in milliseconds")
+	dataFuturesBarsCmd.Flags().String("end-time", "", "End time as timestamp in milliseconds")
 	dataFuturesBarsCmd.MarkFlagRequired("symbol")
 }
 
@@ -792,7 +790,7 @@ var dataFuturesTickCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		count, _ := cmd.Flags().GetInt("count")
-		return doDataGet("/openapi/market-data/futures/tick", map[string]string{
+		return doDataGet("/market-data/futures/ticks/list", map[string]string{
 			"symbol": symbol, "category": category, "count": fmt.Sprintf("%d", count),
 		})
 	},
@@ -826,7 +824,7 @@ var dataFuturesFootprintCmd = &cobra.Command{
 		if sessions != "" {
 			q["trading_sessions"] = sessions
 		}
-		return doDataGet("/openapi/market-data/futures/footprint", q)
+		return doDataGet("/market-data/futures/footprints/list", q)
 	},
 }
 
@@ -846,7 +844,7 @@ var dataFuturesDepthCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		depth, _ := cmd.Flags().GetString("depth")
-		return doDataGet("/openapi/market-data/futures/depth", map[string]string{
+		return doDataGet("/market-data/futures/depths/list", map[string]string{
 			"symbol": symbol, "category": category, "depth": depth,
 		})
 	},
@@ -866,7 +864,7 @@ var dataCryptoSnapshotCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doDataGet("/openapi/market-data/crypto/snapshot", map[string]string{
+		return doDataGet("/market-data/crypto/snapshots/list", map[string]string{
 			"symbols": symbol, "category": category,
 		})
 	},
@@ -886,6 +884,8 @@ var dataCryptoBarsCmd = &cobra.Command{
 		timespan, _ := cmd.Flags().GetString("timespan")
 		count, _ := cmd.Flags().GetInt("count")
 		realTime, _ := cmd.Flags().GetBool("real-time")
+		startTime, _ := cmd.Flags().GetString("start-time")
+		endTime, _ := cmd.Flags().GetString("end-time")
 		q := map[string]string{
 			"symbols": symbol, "category": category,
 			"timespan": timespan, "count": fmt.Sprintf("%d", count),
@@ -895,7 +895,13 @@ var dataCryptoBarsCmd = &cobra.Command{
 		} else {
 			q["real_time_required"] = "false"
 		}
-		return doDataGet("/openapi/market-data/crypto/bars", q)
+		if startTime != "" {
+			q["start_time"] = startTime
+		}
+		if endTime != "" {
+			q["end_time"] = endTime
+		}
+		return doDataGet("/market-data/crypto/bars/list", q)
 	},
 }
 
@@ -905,6 +911,8 @@ func init() {
 	dataCryptoBarsCmd.Flags().String("timespan", "D", "Timespan: M1,M5,M15,M30,M60,M120,M240,D,W,M,Y")
 	dataCryptoBarsCmd.Flags().Int("count", 200, "Number of bars (max 1200)")
 	dataCryptoBarsCmd.Flags().Bool("real-time", true, "Include latest in-progress bar")
+	dataCryptoBarsCmd.Flags().String("start-time", "", "Start time as timestamp in milliseconds")
+	dataCryptoBarsCmd.Flags().String("end-time", "", "End time as timestamp in milliseconds")
 	dataCryptoBarsCmd.MarkFlagRequired("symbol")
 }
 
@@ -915,7 +923,7 @@ var dataEventSnapshotCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
-		return doDataGet("/openapi/market-data/event/snapshot", map[string]string{
+		return doDataGet("/market-data/event-contracts/snapshots/list", map[string]string{
 			"symbols": symbol, "category": category,
 		})
 	},
@@ -935,6 +943,8 @@ var dataEventBarsCmd = &cobra.Command{
 		timespan, _ := cmd.Flags().GetString("timespan")
 		count, _ := cmd.Flags().GetInt("count")
 		realTime, _ := cmd.Flags().GetBool("real-time")
+		startTime, _ := cmd.Flags().GetString("start-time")
+		endTime, _ := cmd.Flags().GetString("end-time")
 		q := map[string]string{
 			"symbols": symbol, "category": category,
 			"timespan": timespan, "count": fmt.Sprintf("%d", count),
@@ -944,7 +954,13 @@ var dataEventBarsCmd = &cobra.Command{
 		} else {
 			q["real_time_required"] = "false"
 		}
-		return doDataGet("/openapi/market-data/event/bars", q)
+		if startTime != "" {
+			q["start_time"] = startTime
+		}
+		if endTime != "" {
+			q["end_time"] = endTime
+		}
+		return doDataGet("/market-data/event-contracts/bars/list", q)
 	},
 }
 
@@ -954,6 +970,8 @@ func init() {
 	dataEventBarsCmd.Flags().String("timespan", "M5", "Timespan: M1,M5,M15,M30,M60,M120,M240,D")
 	dataEventBarsCmd.Flags().Int("count", 200, "Number of bars (max 1200)")
 	dataEventBarsCmd.Flags().Bool("real-time", false, "Include latest unfinalized data")
+	dataEventBarsCmd.Flags().String("start-time", "", "Start time as timestamp in milliseconds")
+	dataEventBarsCmd.Flags().String("end-time", "", "End time as timestamp in milliseconds")
 	dataEventBarsCmd.MarkFlagRequired("symbol")
 }
 
@@ -963,7 +981,7 @@ var dataEventTickCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		count, _ := cmd.Flags().GetInt("count")
-		return doDataGet("/openapi/market-data/event/tick", map[string]string{
+		return doDataGet("/market-data/event-contracts/ticks/list", map[string]string{
 			"symbol": symbol, "category": category, "count": fmt.Sprintf("%d", count),
 		})
 	},
@@ -982,7 +1000,7 @@ var dataEventDepthCmd = &cobra.Command{
 		symbol, _ := cmd.Flags().GetString("symbol")
 		category, _ := cmd.Flags().GetString("category")
 		depth, _ := cmd.Flags().GetString("depth")
-		return doDataGet("/openapi/market-data/event/depth", map[string]string{
+		return doDataGet("/market-data/event-contracts/depths/list", map[string]string{
 			"symbol": symbol, "category": category, "depth": depth,
 		})
 	},
@@ -997,56 +1015,19 @@ func init() {
 
 // ==================== Helper ====================
 
+// newUSDataClient builds an API client for US-only market-data actions. It
+// reuses the standard client and enforces that the active profile's resolved
+// region is US (OAuth region comes from the token, AK/SK from --region at login).
 func newUSDataClient() (*client.APIClient, error) {
 	pm := config.NewProfileManager("")
 	profile, err := pm.GetActive()
 	if err != nil {
 		return nil, err
 	}
-
-	region := profile.Region
-	if flagRegion != "" {
-		region = config.Region(strings.ToLower(strings.TrimSpace(flagRegion)))
-	}
-	if !region.IsValid() {
-		return nil, fmt.Errorf("unsupported region %q", region)
-	}
-	if region != config.RegionUS {
+	if profile.Region != config.RegionUS {
 		return nil, fmt.Errorf("this market-data action is only supported in region 'us'")
 	}
-
-	effectiveProfile := *profile
-	effectiveProfile.Region = region
-
-	var appKey, appSecret, token string
-	if envKey, envSecret, ok := config.EnvCredentials(); ok {
-		appKey = envKey
-		appSecret = envSecret
-	} else {
-		cred, err := config.LoadCredential(effectiveProfile.Name)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load credentials: %w. Run 'webull auth login' to re-authenticate", err)
-		}
-		appKey = cred.AppKey
-		appSecret = cred.AppSecret
-		token = cred.Token
-	}
-
-	envOverrides := config.EnvEndpointOverrides()
-	var overrides *config.RegionEndpoints
-	if effectiveProfile.Endpoints.API != "" {
-		overrides = &config.RegionEndpoints{API: effectiveProfile.Endpoints.API}
-	}
-	endpoints := config.GetEndpoints(region, overrides)
-	if envOverrides != nil && envOverrides.API != "" {
-		endpoints.API = envOverrides.API
-	}
-
-	provider := auth.NewAkSkProvider(&effectiveProfile, pm, appKey, appSecret, token)
-	apiClient := client.NewAPIClient(provider, endpoints, time.Duration(flagTimeout)*time.Second)
-	apiClient.SetVerbose(flagVerbose)
-	apiClient.SetDebug(flagDebug)
-	return apiClient, nil
+	return newAPIClient()
 }
 
 func doUSDataGet(path string, query map[string]string) error {
