@@ -167,6 +167,8 @@ func TestActiveOptionRegion(t *testing.T) {
 		{region: " Us ", want: config.RegionUS},
 		{region: "hk", want: config.RegionHK},
 		{region: "HK", want: config.RegionHK},
+		{region: "au", wantErr: true},
+		{region: "AU", wantErr: true},
 		{region: "za", wantErr: true},
 		{region: "ZA", wantErr: true},
 	} {

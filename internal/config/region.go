@@ -17,17 +17,18 @@ const (
 	RegionUK Region = "uk"
 	RegionBR Region = "br"
 	RegionMX Region = "mx"
+	RegionAU Region = "au"
 	RegionZA Region = "za"
 )
 
 // ValidRegions is the list of currently supported regions.
 //
-// Note: EU and AU are not supported yet due to compliance
-// requirements, so they are intentionally omitted here and fail IsValid.
-// To enable a region later, add its constant back to this list.
+// Note: EU is not supported yet due to compliance requirements, so it is
+// intentionally omitted here and fails IsValid. To enable a region later,
+// add its constant back to this list.
 var ValidRegions = []Region{
 	RegionUS, RegionHK, RegionJP, RegionSG, RegionTH,
-	RegionMY, RegionUK, RegionBR, RegionMX, RegionZA,
+	RegionAU, RegionMY, RegionUK, RegionBR, RegionMX, RegionZA,
 }
 
 // IsValid checks if a region string is supported.
@@ -66,7 +67,7 @@ var prodAPIEndpoints = map[Region]string{
 	RegionJP: "api.webull.co.jp",
 	RegionSG: "api.webull.com.sg",
 	RegionTH: "api.webull.co.th",
-	// RegionAU: "api.webull.com.au", // not supported yet (compliance); re-add the region constant to enable
+	RegionAU: "api.webull.com.au",
 	RegionMY: "api.webull.com.my",
 	RegionUK: "api.webull-uk.com",
 	RegionBR: "api.webull.com",
@@ -83,7 +84,7 @@ var uatAPIEndpoints = map[Region]string{
 	RegionJP: "jp-openapi-alb.uat.webullbroker.com",
 	RegionSG: "sg-api.uat.webullbroker.com",
 	RegionTH: "th-api.uat.webullbroker.com",
-	// RegionAU: "au-api.uat.webullbroker.com", // not supported yet (compliance); re-add the region constant to enable
+	RegionAU: "au-api.uat.webullbroker.com",
 	RegionMY: "my-api.uat.webullbroker.com",
 	RegionUK: "uk-api.uat.webullbroker.com",
 	RegionBR: "us-openapi-alb.uat.webullbroker.com",

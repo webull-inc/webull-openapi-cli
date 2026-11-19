@@ -7,7 +7,7 @@ CLI for [Webull](https://www.webull.com/) OpenAPI. Trade stocks, options, future
 ## Features
 
 - **Full asset coverage**: Stocks, options, futures, crypto, event contracts
-- **Multi-region**: US, HK, JP, SG, TH, MY, UK, BR, MX, ZA
+- **Multi-region**: US, HK, JP, SG, TH, AU, MY, UK, BR, MX, ZA
 - **Agent-first design**: JSON output, `--quiet` mode, structured errors, explicit exit codes
 - **Two auth modes**: OAuth device authorization (default, browser-based) and AK/SK (HMAC signature + optional 2FA token)
 - **Safety**: Order confirmation prompts (skip with `-y`), `--dry-run` mode
