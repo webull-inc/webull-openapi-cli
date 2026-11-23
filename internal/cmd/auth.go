@@ -47,7 +47,7 @@ var authLogoutCmd = &cobra.Command{
 func init() {
 	authLoginCmd.Flags().String("method", "oauth", "Auth method: oauth (default) or credentials (AK/SK)")
 	authLoginCmd.Flags().String("env", "prod", "Environment: prod, sandbox, or uat (sandbox and uat are equivalent)")
-	authLoginCmd.Flags().String("region", "", "Region (required for --method credentials: us, hk, jp, sg, th, my, uk, br, mx, za)")
+	authLoginCmd.Flags().String("region", "", "Region (required for --method credentials: us, hk, jp, sg, th, au, my, uk, br, mx, za)")
 
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
@@ -259,7 +259,7 @@ func runCredentialsLogin(cmd *cobra.Command, args []string) error {
 
 	region := config.Region(regionStr)
 	if !region.IsValid() {
-		output.PrintError("INVALID_REGION", fmt.Sprintf("Invalid region %q. Valid: us, hk, jp, sg, th, my, uk, br, mx, za", regionStr), 0)
+		output.PrintError("INVALID_REGION", fmt.Sprintf("Invalid region %q. Valid: us, hk, jp, sg, th, au, my, uk, br, mx, za", regionStr), 0)
 		return errSilent
 	}
 
